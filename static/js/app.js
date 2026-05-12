@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPlatform = "Multicanal"; // Default
     let currentNiche = "";
 
-    const authScreen = document.getElementById('authScreen');
+    const authScreen = document.getElementById('lp-login');
     const appScreen = document.getElementById('appScreen');
 
     function checkAuth() {

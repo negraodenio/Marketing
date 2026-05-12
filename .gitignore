@@ -6,3 +6,6 @@ __pycache__/
 static/audio/*
 static/uploads/*
 .DS_Store
+
+.vercel
+.env*.local
