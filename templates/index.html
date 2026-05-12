@@ -7,6 +7,10 @@
     <meta name="description" content="Crie campanhas de Instagram, Facebook, TikTok e E-mail com inteligência artificial. Sem experiência necessária. Comece grátis.">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Scripts movidos para o head com DEFER para carregamento prioritário e anti-cache -->
+    <script src="/static/js/modules.js?v=2.1" defer></script>
+    <script src="/static/js/app.js?v=2.1" defer></script>
+    <script>console.log("🛠️ HTML: Scripts registrados no Head.");</script>
 </head>
 <body>
     <div class="glass-bg"></div>
@@ -633,7 +637,5 @@
         </main>
     </div>
 
-    <script src="/static/js/modules.js"></script>
-    <script src="/static/js/app.js"></script>
 </body>
 </html>

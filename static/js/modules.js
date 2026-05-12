@@ -24,7 +24,7 @@ const MKTPilot = (() => {
   }
 
   async function get(path, params = {}) {
-    const token = localStorage.getItem('mktpilot_token');
+    const token = localStorage.getItem('sb_token');
     const authHeaders = { ...headers };
     if (token) authHeaders["Authorization"] = `Bearer ${token}`;
 
