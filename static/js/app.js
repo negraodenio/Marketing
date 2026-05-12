@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPlatform = "Multicanal"; // Default
     let currentNiche = "";
 
-    const authScreen = document.getElementById('lp-login');
+    const authScreen = document.getElementById('authScreen');
     const appScreen = document.getElementById('appScreen');
 
     function checkAuth() {
@@ -106,8 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 authError.classList.remove('hidden');
             }
         } catch (e) {
-            console.error("DEBUG: Erro no fetch", e);
-            authError.innerText = "Erro no servidor.";
+            console.error("DEBUG: Erro CRÍTICO no fetch", e);
+            authError.innerText = "Erro de conexão com o servidor.";
             authError.classList.remove('hidden');
         }
     }
