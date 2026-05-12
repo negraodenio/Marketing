@@ -150,8 +150,167 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetTab === 'automations') {
                 carregarAutomacoes();
             }
+            if (targetTab === 'calendar') {
+                // Opcional: carregar automático ou esperar clique no botão
+            }
+            if (targetTab === 'hooks') {
+                carregarHooksIniciais();
+            }
+            if (targetTab === 'viral') {
+                carregarTendenciasIniciais();
+            }
         });
     });
+
+    // ==========================================
+    // MÓDULOS PREMIUM (INTEGRAÇÃO)
+    // ==========================================
+
+    // 1. Calendário 30 Dias
+    const btnGerarCalendario = document.getElementById('btnGerarCalendario');
+    if (btnGerarCalendario) {
+        btnGerarCalendario.addEventListener('click', async () => {
+            const area = document.getElementById('calendarArea');
+            const content = document.getElementById('calendarContent');
+            btnGerarCalendario.disabled = true;
+            btnGerarCalendario.innerText = "⏳ Gerando Plano...";
+            
+            try {
+                const res = await MKTPilot.Calendario.gerar({
+                    nicho: currentNiche || "Marketing",
+                    objetivo: "Gerar autoridade e vendas",
+                    canais: ["ig", "tiktok", "email"]
+                });
+                area.classList.remove('hidden');
+                MKTPilot.Calendario.renderGrid(res.dias, 'calendarContent');
+            } catch(e) { alert("Erro ao gerar calendário."); }
+            
+            btnGerarCalendario.disabled = false;
+            btnGerarCalendario.innerText = "⚡ Gerar Plano de 30 Dias Agora";
+        });
+    }
+
+    // 2. Hooks Virais
+    async function carregarHooksIniciais() {
+        const container = document.getElementById('hooksContainer');
+        if (!container) return;
+        container.innerHTML = '<p>Carregando ganchos...</p>';
+        try {
+            const res = await MKTPilot.Hooks.listar({ nicho: currentNiche || "negócios" });
+            container.innerHTML = '';
+            res.hooks.forEach(h => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel';
+                card.style.padding = '20px';
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <span class="tag">${h.angulo}</span>
+                        <span style="color:#f59e0b;">🔥 ${h.calor}/5</span>
+                    </div>
+                    <p style="font-weight:600; font-size:1.1rem; margin-bottom:15px;">"${h.texto}"</p>
+                    <div style="font-size:0.8rem; opacity:0.6;">CTR Estimado: ${h.ctr_estimado}%</div>
+                    <button class="btn-secondary" style="margin-top:15px; width:100%;" onclick="adaptarHook('${h.texto.replace(/'/g, "\\'")}')">🪄 Adaptar ao meu Produto</button>
+                `;
+                container.appendChild(card);
+            });
+        } catch(e) { container.innerHTML = '<p>Erro ao carregar hooks.</p>'; }
+    }
+
+    window.adaptarHook = async function(texto) {
+        const produto = prompt("Qual o seu produto para adaptarmos este hook?");
+        if (!produto) return;
+        try {
+            const res = await MKTPilot.Hooks.adaptar(texto, produto, currentNiche);
+            alert(`Hook Adaptado:\n\n${res.hook_adaptado}`);
+        } catch(e) { alert("Erro ao adaptar hook."); }
+    }
+
+    // 3. Clonador de Funil
+    const btnClonarFunil = document.getElementById('btnClonarFunil');
+    if (btnClonarFunil) {
+        btnClonarFunil.addEventListener('click', async () => {
+            const url = document.getElementById('funnelUrl').value;
+            const resDiv = document.getElementById('funnelResult');
+            if (!url) return alert("Insira uma URL!");
+            
+            btnClonarFunil.disabled = true;
+            btnClonarFunil.innerText = "⏳ Analisando Funil...";
+            
+            try {
+                const res = await MKTPilot.Funil.analisar(url, "Meu Produto");
+                resDiv.classList.remove('hidden');
+                resDiv.innerHTML = `
+                    <div class="grid-2">
+                        <div style="border-right:1px solid rgba(255,255,255,0.1); padding-right:20px;">
+                            <h4 style="color:#ef4444;">❌ Concorrente (Score: ${res.concorrente.score})</h4>
+                            <p><strong>Headline:</strong> ${res.concorrente.headline}</p>
+                            <p><strong>Falhas:</strong> ${res.concorrente.falhas.join(', ')}</p>
+                        </div>
+                        <div style="padding-left:20px;">
+                            <h4 style="color:#10b981;">✅ Sua Versão Superior (Score: ${res.superior.score})</h4>
+                            <p><strong>Headline:</strong> ${res.superior.headline}</p>
+                            <p><strong>Diferencial:</strong> ${res.superior.diferenciais.join(', ')}</p>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1);">
+                        <h5>Copy Completo do Funil:</h5>
+                        <div class="resultado-box markdown-body">${converterMarkdown(res.superior.copy_completo)}</div>
+                    </div>
+                `;
+            } catch(e) { alert("Erro ao clonar funil."); }
+            
+            btnClonarFunil.disabled = false;
+            btnClonarFunil.innerText = "🌪️ Analisar e Clonar";
+        });
+    }
+
+    // 4. Viral em 24h
+    async function carregarTendenciasIniciais() {
+        // Opcional: auto-carregar ou esperar botão
+    }
+
+    const btnViralCheck = document.getElementById('btnViralCheck');
+    if (btnViralCheck) {
+        btnViralCheck.addEventListener('click', async () => {
+            const content = document.getElementById('viralContent');
+            btnViralCheck.disabled = true;
+            btnViralCheck.innerText = "⏳ Detectando Tendências...";
+            
+            try {
+                const res = await MKTPilot.Viral.tendencias({ nicho: currentNiche });
+                content.classList.remove('hidden');
+                content.innerHTML = '<div class="cards-grid"></div>';
+                const grid = content.querySelector('.cards-grid');
+                
+                res.tendencias.forEach(t => {
+                    const card = document.createElement('div');
+                    card.className = 'glass-panel';
+                    card.style.padding = '20px';
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <span class="tag">${t.canal}</span>
+                            <span style="color:#ef4444;">🔥 ${t.calor}/5</span>
+                        </div>
+                        <h4>${t.titulo}</h4>
+                        <p style="font-size:0.9rem; opacity:0.8;">${t.descricao}</p>
+                        <div style="font-size:0.8rem; margin-top:10px; color:#10b981;">📈 ${t.views_semana} views</div>
+                        <button class="btn-primary" style="margin-top:15px; width:100%;" onclick="criarCampanhaViral(${JSON.stringify(t).replace(/"/g, '&quot;')})">⚡ Surfar Tendência</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch(e) { alert("Erro ao carregar tendências."); }
+            
+            btnViralCheck.disabled = false;
+            btnViralCheck.innerText = "🔥 Detectar Tendências Agora";
+        });
+    }
+
+    window.criarCampanhaViral = async function(tendencia) {
+        try {
+            const res = await MKTPilot.Viral.criarCampanha(tendencia, "Meu Produto", currentNiche);
+            alert(`Campanha Viral Criada!\n\nHeadline: ${res.headline}\n\nMelhor Horário: ${res.melhor_horario}`);
+        } catch(e) { alert("Erro ao criar campanha viral."); }
+    }
 
     // ==========================================
     // BRAND KIT (DNA da Empresa)
@@ -661,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!text || text.length < 10) return;
         
         try {
-            const res = await fetch('/api/campaigns/score', {
+            const res = await fetch('/api/modules/score', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',

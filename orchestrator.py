@@ -1,4 +1,5 @@
 import os
+from routes.modules import modules_bp
 import requests
 import json
 import asyncio
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta
 
 load_dotenv()
 app = Flask(__name__)
+app.register_blueprint(modules_bp)
 
 # ==========================================
 # CONFIGURAÇÕES E SUPABASE
