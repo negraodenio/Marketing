@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: mkt-copilot-saas
+    runtime: image
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        sync: false
+      - key: OPENROUTER_ANALYSIS_MODEL
+        sync: false
+      - key: SILICONFLOW_API_KEY
+        sync: false
+      - key: replicate
+        sync: false

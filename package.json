@@ -1,0 +1,13 @@
+{
+  "name": "mktpilot-elite",
+  "version": "1.0.0",
+  "description": "MKTPilot Elite - SaaS Marketing Automation",
+  "main": "orchestrator.py",
+  "scripts": {
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "jsdom": "^22.0.0"
+  }
+}
