@@ -1,3 +1,4 @@
+console.log("🚀 MKTPilot: Script iniciado com sucesso.");
 document.addEventListener('DOMContentLoaded', () => {
 
     // ==========================================
@@ -70,55 +71,66 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (authToken) checkConnections();
 
-    // ==========================================
-    // LOGIN E REGISTRO
-    // ==========================================
-    const emailInput = document.getElementById('emailInput');
-    const passInput = document.getElementById('passInput');
-    const authError = document.getElementById('authError');
+    // Os listeners de clique serão registrados abaixo, após a definição global
+});
 
-    window.handleAuth = async function(endpoint) {
-        console.log(`DEBUG: Iniciando ${endpoint}...`);
-        const email = document.getElementById('emailInput').value;
-        const pass = document.getElementById('passInput').value;
-        
-        if (!email || !pass) {
-            console.warn("DEBUG: Campos vazios.");
-            return;
-        }
-        try {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password: pass })
-            });
-            const data = await res.json();
-            console.log("DEBUG: Resposta recebida", data);
-            if (res.ok) {
-                localStorage.setItem('sb_token', data.token);
-                localStorage.setItem('sb_user', data.user);
-                authToken = data.token;
-                userEmail = data.user;
-                authError.classList.add('hidden');
-                checkAuth();
-            } else {
-                authError.innerText = data.erro || "Erro de autenticação";
-                authError.classList.remove('hidden');
-            }
-        } catch (e) {
-            console.error("DEBUG: Erro CRÍTICO no fetch", e);
-            authError.innerText = "Erro de conexão com o servidor.";
-            authError.classList.remove('hidden');
-        }
+// ==========================================
+// LOGIN E REGISTRO (GLOBAL PARA EVITAR TRAVAMENTOS)
+// ==========================================
+window.handleAuth = async function(endpoint) {
+    console.log(`DEBUG: Iniciando ${endpoint}...`);
+    const emailEl = document.getElementById('emailInput');
+    const passEl = document.getElementById('passInput');
+    const authError = document.getElementById('authError');
+    
+    if (!emailEl || !passEl) {
+        console.error("DEBUG: Campos de login não encontrados no DOM!");
+        return;
     }
 
-    document.getElementById('btnLogin').addEventListener('click', () => handleAuth('/api/auth/login'));
-    document.getElementById('btnRegister').addEventListener('click', () => handleAuth('/api/auth/register'));
+    const email = emailEl.value.trim();
+    const pass = passEl.value.trim();
+    
+    if (!email || !pass) {
+        authError.innerText = "Preencha e-mail e senha.";
+        authError.classList.remove('hidden');
+        return;
+    }
 
-    // Suporte a Enter no login
-    passInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleAuth('/api/auth/login');
-    });
+    try {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: pass })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            localStorage.setItem('sb_token', data.token);
+            localStorage.setItem('sb_user', data.user);
+            location.reload(); // Recarrega para iniciar o estado autenticado de forma limpa
+        } else {
+            authError.innerText = data.erro || "Erro de autenticação";
+            authError.classList.remove('hidden');
+        }
+    } catch (e) {
+        console.error("DEBUG: Erro CRÍTICO no fetch", e);
+        authError.innerText = "Erro de conexão. Verifique sua internet.";
+        authError.classList.remove('hidden');
+    }
+}
+
+// Vinculação de eventos (Garantindo que funcione mesmo com scripts lentos)
+document.addEventListener('click', (e) => {
+    if (e.target.id === 'btnLogin') window.handleAuth('/api/auth/login');
+    if (e.target.id === 'btnRegister') window.handleAuth('/api/auth/register');
+});
+
+    if (passInput) {
+        passInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') window.handleAuth('/api/auth/login');
+        });
+    }
 
     // ==========================================
     // SISTEMA DE ABAS DO SAAS
