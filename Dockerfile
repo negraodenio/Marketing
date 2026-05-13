@@ -21,4 +21,4 @@ COPY . .
 ENV PORT=5000
 
 # Executar via Gunicorn (Servidor WSGI para Produção)
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT orchestrator:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT app:app"]

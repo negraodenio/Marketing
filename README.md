@@ -20,9 +20,9 @@ Este é o cérebro central (construído em Python) para gerenciar o ecossistema 
 4. **Configure as chaves de API:**
    - Faça uma cópia do arquivo `.env.example` e renomeie para `.env`.
    - Preencha as chaves verdadeiras (como a do Buffer).
-5. **Rode o Orquestrador:**
+5. **Rode a aplicação:**
    ```bash
-   python orchestrator.py
+   python app.py
    ```
 
 ## Testando os Webhooks Localmente

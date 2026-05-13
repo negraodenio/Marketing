@@ -30,8 +30,9 @@ describe('MKTPilot Elite - Frontend Tests', () => {
       </div>
     `;
 
-    // Mock do fetch global
-    global.fetch = vi.fn();
+    // Mock do fetch no mesmo contexto usado pelo script no navegador
+    window.fetch = vi.fn();
+    global.fetch = window.fetch;
     
     // Mock do localStorage
     const localStorageMock = (() => {

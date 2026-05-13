@@ -1,5 +1,5 @@
 console.log("🚀 MKTPilot: Script iniciado com sucesso.");
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
 
     // ==========================================
     // ESTADO DA APLICAÇÃO E AUTH
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
 
     // Logout
-    document.getElementById('btnLogout').addEventListener('click', () => {
+    document.getElementById('btnLogout')?.addEventListener('click', () => {
         localStorage.removeItem('sb_token');
         localStorage.removeItem('sb_user');
         authToken = null;
@@ -72,12 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (authToken) checkConnections();
 
     // Os listeners de clique serão registrados abaixo, após a definição global
-});
+
 
 // ==========================================
 // LOGIN E REGISTRO (GLOBAL PARA EVITAR TRAVAMENTOS)
 // ==========================================
-window.handleAuth = async function(endpoint) {
+(document.defaultView || window).handleAuth = async function(endpoint) {
     console.log(`DEBUG: Iniciando ${endpoint}...`);
     const emailEl = document.getElementById('emailInput');
     const passEl = document.getElementById('passInput');
@@ -92,13 +92,16 @@ window.handleAuth = async function(endpoint) {
     const pass = passEl.value.trim();
     
     if (!email || !pass) {
+        if (!authError) return;
         authError.innerText = "Preencha e-mail e senha.";
         authError.classList.remove('hidden');
         return;
     }
 
     try {
-        const res = await fetch(endpoint, {
+        const appWindow = document.defaultView || window;
+        const fetchFn = appWindow.fetch || window.fetch;
+        const res = await fetchFn(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password: pass })
@@ -106,10 +109,16 @@ window.handleAuth = async function(endpoint) {
         const data = await res.json();
         
         if (res.ok) {
-            localStorage.setItem('sb_token', data.token);
-            localStorage.setItem('sb_user', data.user);
-            location.reload(); // Recarrega para iniciar o estado autenticado de forma limpa
+            authToken = data.token;
+            userEmail = data.user;
+            const storage = (document.defaultView || window).localStorage || localStorage;
+            storage.setItem('sb_token', authToken);
+            storage.setItem('sb_user', userEmail);
+            if (authError) authError.classList.add('hidden');
+            checkAuth();
+            checkConnections();
         } else {
+            if (!authError) return;
             authError.innerText = data.erro || "Erro de autenticação";
             authError.classList.remove('hidden');
         }
@@ -120,12 +129,16 @@ window.handleAuth = async function(endpoint) {
     }
 }
 
-// Vinculação de eventos (Garantindo que funcione mesmo com scripts lentos)
+// Vinculação de eventos robusta
 document.addEventListener('click', (e) => {
-    if (e.target.id === 'btnLogin') window.handleAuth('/api/auth/login');
-    if (e.target.id === 'btnRegister') window.handleAuth('/api/auth/register');
+    if (!e.target || !e.target.closest) return;
+    const loginBtn = e.target.closest('#btnLogin');
+    const registerBtn = e.target.closest('#btnRegister');
+    if (loginBtn) window.handleAuth('/api/auth/login');
+    if (registerBtn) window.handleAuth('/api/auth/register');
 });
 
+    const passInput = document.getElementById('passInput');
     if (passInput) {
         passInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') window.handleAuth('/api/auth/login');
@@ -145,7 +158,7 @@ document.addEventListener('click', (e) => {
             
             link.classList.add('active');
             const targetTab = link.dataset.tab;
-            document.getElementById(`tab-${targetTab}`).classList.remove('hidden');
+            document.getElementById(`tab-${targetTab}`)?.classList.remove('hidden');
             
             // Resetar wizard ao clicar em "Nova Campanha"
             if (targetTab === 'wizard') {
@@ -261,15 +274,18 @@ document.addEventListener('click', (e) => {
     function resetWizard() {
         currentPlatform = "Multicanal";
         currentNiche = "";
-        document.getElementById('wiz-step-1').classList.remove('hidden');
-        document.getElementById('wiz-step-2').classList.add('hidden');
-        document.getElementById('wiz-step-3').classList.add('hidden');
-        document.getElementById('wiz-step-4').classList.add('hidden');
-        document.getElementById('loadingCopilot').classList.add('hidden');
-        document.getElementById('resultadoCopilot').classList.add('hidden');
-        document.getElementById('resultadoCopilot').innerHTML = '';
-        document.getElementById('wizProduto').value = "";
-        document.getElementById('btnGerarMagica').disabled = false;
+        document.getElementById('wiz-step-1')?.classList.remove('hidden');
+        document.getElementById('wiz-step-2')?.classList.add('hidden');
+        document.getElementById('wiz-step-3')?.classList.add('hidden');
+        document.getElementById('wiz-step-4')?.classList.add('hidden');
+        document.getElementById('loadingCopilot')?.classList.add('hidden');
+        document.getElementById('resultadoCopilot')?.classList.add('hidden');
+        const resultado = document.getElementById('resultadoCopilot');
+        if (resultado) resultado.innerHTML = '';
+        const produto = document.getElementById('wizProduto');
+        if (produto) produto.value = "";
+        const gerarBtn = document.getElementById('btnGerarMagica');
+        if (gerarBtn) gerarBtn.disabled = false;
         // Reset progress
         document.querySelectorAll('.progress-step').forEach((s, i) => {
             s.classList.toggle('active', i === 0);
@@ -281,26 +297,26 @@ document.addEventListener('click', (e) => {
     // ==========================================
     window.selectPlatform = function(platform) {
         currentPlatform = platform;
-        document.getElementById('wiz-step-1').classList.add('hidden');
-        document.getElementById('wiz-step-2').classList.remove('hidden');
+        document.getElementById('wiz-step-1')?.classList.add('hidden');
+        document.getElementById('wiz-step-2')?.classList.remove('hidden');
         // Update progress
         document.querySelectorAll('.progress-step').forEach((s, i) => s.classList.toggle('active', i <= 1));
     }
 
     window.selectNiche = function(niche) {
         currentNiche = niche;
-        document.getElementById('wiz-step-2').classList.add('hidden');
-        document.getElementById('wiz-step-3').classList.remove('hidden');
+        document.getElementById('wiz-step-2')?.classList.add('hidden');
+        document.getElementById('wiz-step-3')?.classList.remove('hidden');
         // Update progress
         document.querySelectorAll('.progress-step').forEach((s, i) => s.classList.toggle('active', i <= 2));
     }
 
     window.nextWizard = function(step) {
-        if (step === 4 && !document.getElementById('wizProduto').value) {
+        if (step === 4 && !document.getElementById('wizProduto')?.value) {
             alert('Descreva o que você vende!'); return;
         }
-        document.getElementById('wiz-step-3').classList.add('hidden');
-        document.getElementById('wiz-step-4').classList.remove('hidden');
+        document.getElementById('wiz-step-3')?.classList.add('hidden');
+        document.getElementById('wiz-step-4')?.classList.remove('hidden');
         // Update progress
         document.querySelectorAll('.progress-step').forEach((s, i) => s.classList.toggle('active', i <= 3));
     }
@@ -310,8 +326,9 @@ document.addEventListener('click', (e) => {
     const resultadoCopilot = document.getElementById('resultadoCopilot');
     const loadingCopilot = document.getElementById('loadingCopilot');
 
+    if (btnGerarMagica && resultadoCopilot && loadingCopilot) {
     btnGerarMagica.addEventListener('click', async () => {
-        const produto = document.getElementById('wizProduto').value;
+        const produto = document.getElementById('wizProduto')?.value || '';
         const selectedRadio = document.querySelector('input[name="objetivo"]:checked');
         const objetivo = selectedRadio ? selectedRadio.value : 'Aumentar seguidores e criar autoridade no nicho';
         
@@ -323,7 +340,7 @@ document.addEventListener('click', (e) => {
         const publicoAlvo = localStorage.getItem('brandkit_publico') || '';
 
         // Esconder wizard steps e mostrar loading
-        document.getElementById('wiz-step-4').classList.add('hidden');
+        document.getElementById('wiz-step-4')?.classList.add('hidden');
         loadingCopilot.classList.remove('hidden');
         resultadoCopilot.classList.add('hidden');
         resultadoCopilot.innerHTML = '';
@@ -365,6 +382,7 @@ document.addEventListener('click', (e) => {
         }
         btnGerarMagica.disabled = false;
     });
+    }
 
     // ==========================================
     // HISTÓRICO (Supabase Data)
@@ -405,7 +423,7 @@ document.addEventListener('click', (e) => {
         }
     }
 
-    document.getElementById('btnLoadHistory').addEventListener('click', carregarHistorico);
+    document.getElementById('btnLoadHistory')?.addEventListener('click', carregarHistorico);
 
     // ==========================================
     // EVA BRAIN (MiniMax Contexto Massivo)
@@ -436,8 +454,9 @@ document.addEventListener('click', (e) => {
         });
     }
 
+    if (btnOtimizar && resultadoEva && loadingEva) {
     btnOtimizar.addEventListener('click', async () => {
-        const relatorio = document.getElementById('relatorioInput').value;
+        const relatorio = document.getElementById('relatorioInput')?.value || '';
         
         if (evaMode === 'manual' && !relatorio) {
             alert('Cole os dados de campanha no campo de texto!');
@@ -472,6 +491,7 @@ document.addEventListener('click', (e) => {
         }
         btnOtimizar.disabled = false;
     });
+    }
 
     function converterMarkdown(text) {
         if (typeof text !== 'string') return "";
@@ -1175,4 +1195,16 @@ document.addEventListener('click', (e) => {
             alert("Erro de conexão.");
         }
     }
-});
+    window.switchTab = function(tabId) {
+        console.log("DEBUG: Switching to tab", tabId);
+        document.querySelectorAll('.nav-links li, .nav-item').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll(`[data-tab="${tabId}"], .nav-item[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => { p.classList.add('hidden'); p.classList.remove('active'); });
+        const target = document.getElementById(tabId);
+        if (target) { target.classList.remove('hidden'); target.classList.add('active'); target.classList.add('fade-in'); }
+    };
+    document.querySelectorAll('.nav-links li').forEach(li => {
+        li.addEventListener('click', () => { const id = li.getAttribute('data-tab'); if (id) switchTab(id); });
+    });
+}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initApp); } else { initApp(); }

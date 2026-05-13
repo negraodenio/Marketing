@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+load_dotenv(override=True) # Carrega as chaves antes de tudo
+
 from routes.modules import modules_bp
 import requests
 import json
@@ -10,7 +13,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 
-load_dotenv()
+# load_dotenv removido daqui
 app = Flask(__name__)
 app.register_blueprint(modules_bp)
 
@@ -20,8 +23,9 @@ app.register_blueprint(modules_bp)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_anon_key") # Aceita o nome padrão do Supabase
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3-70b-instruct")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL") or "meta-llama/llama-3-70b-instruct"
 OPENROUTER_ANALYSIS_MODEL = os.getenv("OPENROUTER_ANALYSIS_MODEL", "minimax/minimax-01")
+DEMO_LOGIN_ENABLED = os.getenv("DEMO_LOGIN_ENABLED", "false").lower() == "true"
 
 # Configurações Meta Ads
 META_APP_ID = os.getenv("META_APP_ID")
@@ -155,11 +159,11 @@ def gerar_audio_tts(roteiro_completo, produto):
     filepath = os.path.join('static', 'audio', filename)
     
     try:
-        print(f"🎙️ Gerando TTS para: {produto}...", flush=True)
+        print(f"Gerando TTS para: {produto}...", flush=True)
         asyncio.run(generate_tts_async(roteiro_completo, filepath))
         return f"/static/audio/{filename}"
     except Exception as e:
-        print(f"❌ Erro ao gerar TTS: {e}", flush=True)
+        print(f"Erro ao gerar TTS: {e}", flush=True)
         return None
 
 # ==========================================
@@ -503,7 +507,7 @@ def login():
     senha = dados.get("password")
     
     # BYPASS PARA TESTE ELITE (Modo Demo)
-    if email == "demo@mktpilot.io":
+    if DEMO_LOGIN_ENABLED and email == "demo@mktpilot.io":
         return jsonify({"user": "demo@mktpilot.io", "token": "demo-token-elite-2025"}), 200
 
     if not supabase: return jsonify({"erro": "Supabase não configurado."}), 500
@@ -670,9 +674,9 @@ Responda EXATAMENTE neste formato JSON:
             }).execute()
             if insert_res.data:
                 camp_id = insert_res.data[0].get('id')
-            print("✅ Campanha salva no banco com sucesso!", flush=True)
+                print("Campanha salva no banco com sucesso!", flush=True)
     except Exception as e:
-        print(f"⚠️ Aviso: Falha ao salvar campanha: {e}", flush=True)
+        print(f"Aviso: Falha ao salvar campanha: {e}", flush=True)
 
     return jsonify({"resultado": campaign_data, "id": camp_id}), 200
 
@@ -1394,9 +1398,10 @@ def autopilot_worker():
 threading.Thread(target=autopilot_worker, daemon=True).start()
 
 if __name__ == '__main__':
-    print("🚀 NÚCLEO SAAS COPILOTO INICIADO NA PORTA 5000 🚀", flush=True)
-    print("=> Verificando Banco Supabase: " + ("Conectado!" if supabase else "⚠️ CHAVES FALTANDO NO .ENV"), flush=True)
-    print("=> Cliente Admin (service_role): " + ("OK" if supabase_admin else "⚠️ Usando anon_key (pode dar erro RLS)"), flush=True)
-    print("=> Chave OpenRouter: " + ("OK" if OPENROUTER_API_KEY else "⚠️ AUSENTE"), flush=True)
-    print("=> Chave SiliconFlow: " + ("OK" if SILICONFLOW_API_KEY else "⚠️ AUSENTE"), flush=True)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    debug_enabled = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    print("INICIADO NA PORTA 5000")
+    print("=> Verificando Banco Supabase: " + ("Conectado!" if supabase else "AUSENTE"), flush=True)
+    print("=> Cliente Admin (service_role): " + ("OK" if supabase_admin else "Aviso: Usando anon_key"), flush=True)
+    print("=> Chave OpenRouter: " + ("OK" if OPENROUTER_API_KEY else "AUSENTE"), flush=True)
+    print("=> Chave SiliconFlow: " + ("OK" if SILICONFLOW_API_KEY else "AUSENTE"), flush=True)
+    app.run(host='0.0.0.0', port=5000, debug=debug_enabled, use_reloader=False)
