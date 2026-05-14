@@ -517,6 +517,12 @@ def revisar_campanha_completa(campaign_data):
 # ROTAS FRONTEND E AUTH
 # ==========================================
 @app.route('/')
+def landing():
+    return render_template('landing.html')
+
+@app.route('/app')
+@app.route('/login')
+@app.route('/register')
 def index():
     return render_template('index.html')
 
