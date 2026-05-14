@@ -149,22 +149,34 @@ document.addEventListener('click', (e) => {
     // ==========================================
     window.switchTab = function(tabId) {
         console.log("DEBUG: Alternando para aba", tabId);
-        document.querySelectorAll('.nav-links li, .nav-item').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+        
         const baseId = tabId.replace('tab-', '');
-        document.querySelectorAll(`[data-tab="${baseId}"], .nav-item[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
+        document.querySelectorAll(`[data-tab="${baseId}"]`).forEach(el => el.classList.add('active'));
+        
         const target = document.getElementById(tabId.startsWith('tab-') ? tabId : `tab-${tabId}`);
-        if (target) { target.classList.remove('hidden'); target.classList.add('fade-in'); }
+        if (target) { 
+            target.classList.remove('hidden'); 
+            target.classList.add('fade-in'); 
+        }
+
+        const titleMap = { 'wizard': 'Dashboard', 'history': 'Campanhas', 'evabrain': 'Eva Oracle', 'leads': 'Lead Hunter', 'config': 'Branding' };
+        const titleEl = document.getElementById('currentTabTitle');
+        if (titleEl) titleEl.innerText = titleMap[baseId] || baseId;
+
         if (baseId === 'wizard') resetWizard();
         if (baseId === 'history') carregarHistorico();
         if (baseId === 'config') carregarBrandKit();
         if (baseId === 'automations') carregarAutomacoes();
-        if (baseId === 'hooks') carregarHooksIniciais();
-        if (baseId === 'viral') carregarTendenciasIniciais();
-        if (baseId === 'marketplace') loadMarketplace();
     };
-    document.querySelectorAll('.nav-links li').forEach(link => {
-        link.addEventListener('click', () => { const tab = link.dataset.tab; if (tab) switchTab(`tab-${tab}`); });
+
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => { 
+            e.preventDefault();
+            const tab = link.dataset.tab; 
+            if (tab) switchTab(`tab-${tab}`); 
+        });
     });
 
 
@@ -351,45 +363,40 @@ document.addEventListener('click', (e) => {
         });
     }
 
-    let maxStepReached = 1;
-    const stepGuides = {
-        1: { title: "Passo 1: Escolha a Plataforma", desc: "Selecione onde você deseja que sua campanha seja exibida para otimizarmos o formato.", icon: "📱" },
-        2: { title: "Passo 2: Tipo de Negócio", desc: "Isso ajuda a Aura IA a entender o tom de voz e o público-alvo ideal.", icon: "🏢" },
-        3: { title: "Passo 3: Detalhes do Produto", desc: "Descreva o que você vende. Você também pode colar o link de um concorrente!", icon: "🎁" },
-        4: { title: "Passo 4: Inteligência de Mercado", desc: "Analisamos tendências e palavras-chave para garantir que sua campanha seja encontrada.", icon: "📡" },
-        5: { title: "Passo 5: Objetivo Final", desc: "O que você quer alcançar? A IA vai focar toda a estratégia nesse resultado.", icon: "🎯" }
-    };
-
     window.updateWizardProgress = function(step) {
         if (step > maxStepReached) maxStepReached = step;
-        for (let i = 1; i <= 5; i++) {
+        for (let i = 1; i <= 4; i++) {
             const el = document.getElementById(`pstep-${i}`);
             if (!el) continue;
             el.classList.toggle('active', i === step);
             el.classList.toggle('completed', i < step);
         }
-        const line = document.getElementById('stepLineFill');
-        if (line) {
-            const width = (step - 1) * 25;
-            line.style.width = `${width}%`;
-        }
-        const guide = stepGuides[step];
-        if (guide) {
-            document.getElementById('guideTitle').innerText = guide.title;
-            document.getElementById('guideDesc').innerText = guide.desc;
-            document.querySelector('#stepGuide .icon').innerText = guide.icon;
-        }
     }
 
     window.goToStep = function(step) {
-        if (step > maxStepReached && step > maxStepReached + 1) return;
-        for (let i = 1; i <= 5; i++) {
+        if (step > 4) return;
+        for (let i = 1; i <= 4; i++) {
             document.getElementById(`wiz-step-${i}`)?.classList.add('hidden');
         }
         document.getElementById(`wiz-step-${step}`)?.classList.remove('hidden');
         document.getElementById('loadingCopilot')?.classList.add('hidden');
         document.getElementById('resultadoCopilot')?.classList.add('hidden');
         updateWizardProgress(step);
+    }
+
+    function resetWizard() {
+        currentPlatform = "Multicanal";
+        currentNiche = "";
+        maxStepReached = 1;
+        for (let i = 1; i <= 4; i++) {
+            document.getElementById(`wiz-step-${i}`)?.classList.add('hidden');
+        }
+        document.getElementById('wiz-step-1')?.classList.remove('hidden');
+        document.getElementById('loadingCopilot')?.classList.add('hidden');
+        document.getElementById('resultadoCopilot')?.classList.add('hidden');
+        const resultado = document.getElementById('resultadoCopilot');
+        if (resultado) resultado.innerHTML = '';
+        updateWizardProgress(1);
     }
 
     function resetWizard() {
@@ -423,17 +430,8 @@ document.addEventListener('click', (e) => {
 
     window.generateMarketIntelligence = async function() {
         const produto = document.getElementById('wizProduto')?.value || '';
-        const nicho = currentNiche || 'Geral';
         if (!produto) { alert('Descreva o seu produto primeiro!'); return; }
-        goToStep(4);
-        const marketArea = document.getElementById('marketDataArea');
-        marketArea.innerHTML = '<div class="loading-mini"><div class="spinner-small"></div> 📡 Conectando aos dados da Semrush...</div>';
-        try {
-            const data = await MKTPilot.SEO.marketIntelligence(nicho, produto);
-            renderMarketIntelligence(data);
-        } catch (e) {
-            marketArea.innerHTML = '<p>Erro ao obter dados de mercado. Tente novamente.</p>';
-        }
+        goToStep(4); // Na estrutura Pro, Step 4 é Objetivo/Geração
     }
 
     function renderMarketIntelligence(data) {
@@ -480,18 +478,15 @@ document.addEventListener('click', (e) => {
         if (runningJobs.length > 0) {
             activeArea.classList.remove('hidden');
             badge.classList.remove('hidden');
-            badge.innerText = `${runningJobs.length} Tarefa${runningJobs.length > 1 ? 's' : ''} Ativa${runningJobs.length > 1 ? 's' : ''}`;
+            badge.innerText = `${runningJobs.length} Tarefa Ativa`;
             
             activeList.innerHTML = runningJobs.map(job => `
-                <div class="active-job-card fade-in">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--accent-gold);">Aura Processing</span>
-                        <span style="font-size:0.75rem; opacity:0.6;">${job.progress || 0}%</span>
+                <div class="pro-card fade-in" style="margin-bottom:12px; border-left: 4px solid var(--accent-primary);">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="font-size:0.7rem; font-weight:700; color:var(--accent-primary);">AI ORCHESTRATION</span>
+                        <span style="font-size:0.75rem;">${job.progress || 0}%</span>
                     </div>
-                    <div style="font-size: 0.85rem; font-weight: 500; margin-bottom:12px;">${escapeHTML(job.current_step || 'Orquestrando...')}</div>
-                    <div style="width:100%; height:2px; background:rgba(255,255,255,0.05); border-radius:10px; overflow:hidden;">
-                        <div style="width:${job.progress}%; height:100%; background:var(--accent-gold); transition: width 0.5s ease;"></div>
-                    </div>
+                    <div style="font-size: 0.85rem; font-weight: 500;">${escapeHTML(job.current_step || 'Processando...')}</div>
                 </div>
             `).join('');
         } else {
