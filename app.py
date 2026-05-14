@@ -475,36 +475,60 @@ def get_user_from_token(token):
 # NÚCLEO DE INTELIGÊNCIA DUAL-MODEL
 # ==========================================
 def chamar_ia(prompt, system_message="Você é um assistente de marketing especialista.", modelo_forcado=None):
+    """
+    Motor de IA com Redundância (Cascata de Fallback):
+    1. Llama 3 (OpenRouter)
+    2. GPT-4o-Mini (OpenRouter)
+    3. Gemini Flash (OpenRouter)
+    """
     if not OPENROUTER_API_KEY:
-        return f"[Simulação IA - Coloque a OPENROUTER_API_KEY no .env]: {prompt[:40]}..."
+        return f"[Simulação IA]: {prompt[:40]}..."
 
-    modelo_final = modelo_forcado if modelo_forcado else OPENROUTER_MODEL
+    modelos = [modelo_forcado] if modelo_forcado else [
+        OPENROUTER_MODEL, 
+        "openai/gpt-4o-mini", 
+        "google/gemini-2.0-flash-001"
+    ]
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "https://meu-saas-copiloto.local",
-        "X-Title": "Antigravity Copilot",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": modelo_final,
-        "messages": [
-            {"role": "system", "content": system_message + "\n\nIMPORTANTE: Use Markdown estruturado (headers, listas, negrito) para garantir que este conteúdo seja perfeitamente legível por sistemas de AI Search (Perplexity, ChatGPT, Claude)."},
-            {"role": "user", "content": prompt}
-        ]
-    }
-    try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=45)
-        response.raise_for_status()
-        data = response.json()
-        if data and 'choices' in data and len(data['choices']) > 0:
-            content = data['choices'][0].get('message', {}).get('content')
-            if content: return content
-        print(f"⚠️ OpenRouter retorno inesperado: {data}", flush=True)
-        return "Erro na estrutura da IA."
-    except Exception as e:
-        print(f"❌ Erro OpenRouter: {e}", flush=True)
-        return "Falha na conexão com IA."
+    for model in modelos:
+        if not model: continue
+        print(f"🧠 AI Orchestration: Tentando modelo {model}...", flush=True)
+        
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://mktpilot.io",
+            "X-Title": "MKTPilot Pro",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": f"{system_message}\n\nSTRICT: Return ONLY the raw data requested. No conversational filler."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 2000
+        }
+        
+        try:
+            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=40)
+            if response.status_code != 200:
+                print(f"⚠️ Modelo {model} falhou ({response.status_code}). Tentando próximo...", flush=True)
+                continue
+                
+            data = response.json()
+            if data and 'choices' in data and len(data['choices']) > 0:
+                content = data['choices'][0].get('message', {}).get('content')
+                if content and len(content.strip()) > 10:
+                    print(f"✅ Sucesso com {model}", flush=True)
+                    return content
+            
+            print(f"⚠️ Resposta inválida de {model}. Tentando próximo...", flush=True)
+        except Exception as e:
+            print(f"❌ Erro de conexão com {model}: {e}. Tentando próximo...", flush=True)
+            continue
+
+    return "Erro Crítico: Todos os modelos de IA falharam. Por favor, verifique sua conexão ou API Key."
 
 # ==========================================
 # REVISÃO AUTOMÁTICA DE TEXTOS (Pós-processamento)
@@ -665,58 +689,41 @@ def process_campaign_job(job_id, user_id, dados):
             }
         }
 
-        prompt = f"""Crie uma campanha de marketing completa e de alto nível para o produto "{produto}".
+        prompt = f"""Crie uma campanha de marketing completa para "{produto}".
 Nicho: {nicho}. Objetivo: {objetivo}.{contexto_spy}
-Público-alvo: {publico_alvo}. Tom de voz: {tom_de_voz}.
-Plataforma principal: {plataforma}.
+Público: {publico_alvo}. Tom: {tom_de_voz}.
 
-INSTRUÇÕES OBRIGATÓRIAS:
-1. Gere 3 variações de Meta Ads (A: Foco em Ganho, B: Foco em Medo/Urgência, C: Foco em Curiosidade).
-2. Gere 2 posts estratégicos para Instagram com legendas magnéticas.
-3. Gere um script de vídeo curto (Reels/TikTok) com Hook, Body e CTA.
-4. Gere uma sequência de e-mail marketing (2 variações).
+REGRAS:
+- Gere 3 variações de Meta Ads.
+- Gere 2 posts Instagram.
+- Gere 1 script de vídeo e 2 e-mails.
 
-RETORNE APENAS O JSON seguindo rigorosamente esta estrutura:
+RETORNE APENAS JSON:
 {json.dumps(schema, indent=2)}"""
         
-        system_msg = "Você é o motor de IA do MKTPilot Pro. Sua saída é puramente JSON técnico de marketing de alta conversão. Não responda com texto explicativo."
-        resposta_bruta = chamar_ia(prompt, system_message=system_msg, modelo_forcado=OPENROUTER_MODEL)
+        system_msg = "Você é o motor de IA do MKTPilot Pro. Sua saída é puramente JSON técnico de marketing. Sem conversas."
+        resposta_bruta = chamar_ia(prompt, system_message=system_msg)
         
-        def extrair_json_do_texto(texto):
+        def safe_json_extract(texto):
             if not texto: return None
-            if "Falha na conexão" in texto or "Erro na estrutura" in texto:
-                raise Exception(texto) # Repassa o erro da IA
-                
             # Limpeza profunda
-            texto_limpo = texto.strip()
-            # Remove blocos de código markdown
-            texto_limpo = re.sub(r'```json\s*', '', texto_limpo)
-            texto_limpo = re.sub(r'```\s*', '', texto_limpo)
-            
+            t = texto.strip()
+            t = re.sub(r'```json\s*', '', t)
+            t = re.sub(r'```\s*', '', t)
             try:
-                # Localiza o objeto JSON mais externo
-                start = texto_limpo.find('{')
-                end = texto_limpo.rfind('}') + 1
-                if start == -1 or end <= start:
-                    return None
-                    
-                json_str = texto_limpo[start:end]
-                
-                # Correções comuns de LLM (vírgulas extras, quebras de linha em strings)
-                # Remove vírgulas antes de fechamento de objeto/array
-                json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
-                
-                return json.loads(json_str)
-            except Exception as e:
-                print(f"⚠️ Erro no parsing secundário: {e}")
-                return None
+                start, end = t.find('{'), t.rfind('}') + 1
+                if start == -1 or end <= start: return None
+                js = t[start:end]
+                js = re.sub(r',\s*([\]}])', r'\1', js) # Fix trailing commas
+                return json.loads(js)
+            except: return None
 
-        campaign_data = extrair_json_do_texto(resposta_bruta)
+        campaign_data = safe_json_extract(resposta_bruta)
         if not campaign_data:
-            print(f"❌ Erro Crítico de Formato. Resposta da IA:\n{resposta_bruta}", flush=True)
-            raise Exception("A IA se confundiu na estrutura. Clique em 'Gerar' novamente para recalibrar.")
+            print(f"❌ Falha de Formato IA. Conteúdo:\n{resposta_bruta}", flush=True)
+            raise Exception("A IA se confundiu na estrutura. Por favor, tente gerar novamente.")
 
-        update_job(progress=40, step="Polindo textos e preparando artes...")
+        update_job(progress=40, step="Polindo textos e preparando criativos...")
         campaign_data = revisar_campanha_completa(campaign_data)
 
         # 3. Geração de Imagens

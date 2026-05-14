@@ -129,7 +129,31 @@ create table if not exists competitor_monitors (
   created_at  timestamptz default now()
 );
 
--- 6. RLS (SEGURANÇA)
+-- 6. CRM E PROSPECÇÃO (Lead Hunter)
+create table if not exists lead_hunter_results (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users(id) on delete cascade,
+  name        text,
+  phone       text,
+  website     text,
+  pain_points text[],
+  ai_analysis text,
+  pitch_script text,
+  status      text default 'ready',
+  created_at  timestamptz default now()
+);
+
+create table if not exists proposals (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users(id) on delete cascade,
+  campaign_id bigint references campaigns(id) on delete cascade,
+  client_name text,
+  content     jsonb,
+  status      text default 'sent',
+  created_at  timestamptz default now()
+);
+
+-- 7. RLS (SEGURANÇA)
 alter table campaigns enable row level security;
 alter table user_meta_tokens enable row level security;
 alter table user_tiktok_tokens enable row level security;
@@ -141,6 +165,8 @@ alter table marketplace_templates enable row level security;
 alter table autopilot_configs enable row level security;
 alter table autopilot_logs enable row level security;
 alter table competitor_monitors enable row level security;
+alter table lead_hunter_results enable row level security;
+alter table proposals enable row level security;
 
 -- Políticas Simplificadas
 create policy "own_campaigns" on campaigns for all using (auth.uid() = user_id);
@@ -154,6 +180,8 @@ create policy "own_marketplace" on marketplace_templates for all using (auth.uid
 create policy "own_configs" on autopilot_configs for all using (auth.uid() = user_id);
 create policy "own_logs" on autopilot_logs for all using (exists (select 1 from autopilot_configs where id = autopilot_logs.config_id and user_id = auth.uid()));
 create policy "own_monitors" on competitor_monitors for all using (auth.uid() = user_id);
+create policy "own_leads" on lead_hunter_results for all using (auth.uid() = user_id);
+create policy "own_proposals" on proposals for all using (auth.uid() = user_id);
 
 -- Trigger para updated_at
 create or replace function update_modified_column()
