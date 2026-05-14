@@ -728,18 +728,6 @@ def api_copilot_gerar():
 
     dados = request.json or {}
     
-    # 0. Rate Limit Check (1 geração por minuto)
-    try:
-        db = get_db(request)
-        last_job = db.table("background_jobs").select("created_at").eq("user_id", user.id).order("created_at", desc=True).limit(1).execute()
-        if last_job.data:
-            from datetime import datetime, timezone
-            last_time = datetime.fromisoformat(last_job.data[0]['created_at'].replace('Z', '+00:00'))
-            if datetime.now(timezone.utc) - last_time < timedelta(minutes=1):
-                return jsonify({"erro": "Aura IA precisa descansar. Aguarde 1 minuto entre gerações."}), 429
-    except Exception as e:
-        print(f"Erro no Rate Limit: {e}")
-
     # 1. Cria o registro do Job no banco
     try:
         db = get_db(request)
