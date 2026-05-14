@@ -472,7 +472,6 @@ document.addEventListener('click', (e) => {
         const activeArea = document.getElementById('activeJobsArea');
         const activeList = document.getElementById('activeJobsList');
         const badge = document.getElementById('jobBadge');
-        const badgeText = document.getElementById('jobBadgeText');
         
         if (!activeArea || !activeList || !badge) return;
 
@@ -481,17 +480,18 @@ document.addEventListener('click', (e) => {
         if (runningJobs.length > 0) {
             activeArea.classList.remove('hidden');
             badge.classList.remove('hidden');
-            badgeText.innerText = `${runningJobs.length} tarefa${runningJobs.length > 1 ? 's' : ''} ativa${runningJobs.length > 1 ? 's' : ''}`;
+            badge.innerText = `${runningJobs.length} Tarefa${runningJobs.length > 1 ? 's' : ''} Ativa${runningJobs.length > 1 ? 's' : ''}`;
             
             activeList.innerHTML = runningJobs.map(job => `
                 <div class="active-job-card fade-in">
-                    <div class="job-info">
-                        <div style="font-size: 0.85rem; font-weight: 600;">${escapeHTML(job.current_step || 'Processando...')}</div>
-                        <div class="job-progress-mini">
-                            <div class="job-progress-fill-mini" style="width: ${job.progress || 0}%"></div>
-                        </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <span style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--accent-gold);">Aura Processing</span>
+                        <span style="font-size:0.75rem; opacity:0.6;">${job.progress || 0}%</span>
                     </div>
-                    <div style="font-size: 0.75rem; opacity: 0.6; margin-left: 15px;">${job.progress || 0}%</div>
+                    <div style="font-size: 0.85rem; font-weight: 500; margin-bottom:12px;">${escapeHTML(job.current_step || 'Orquestrando...')}</div>
+                    <div style="width:100%; height:2px; background:rgba(255,255,255,0.05); border-radius:10px; overflow:hidden;">
+                        <div style="width:${job.progress}%; height:100%; background:var(--accent-gold); transition: width 0.5s ease;"></div>
+                    </div>
                 </div>
             `).join('');
         } else {
@@ -541,13 +541,13 @@ document.addEventListener('click', (e) => {
                 if (job.status === 'processing' || job.status === 'pending') {
                     if (!silent && loadingCopilot && !loadingCopilot.classList.contains('hidden')) {
                         loadingCopilot.innerHTML = `
-                            <div class="glass-panel fade-in" style="padding:40px; text-align:center; max-width:500px; margin:0 auto;">
-                                <div class="spinner" style="width:50px; height:50px; margin-bottom:20px;"></div>
-                                <h3 style="color:var(--accent); margin-bottom:10px;">${escapeHTML(job.current_step || 'Processando...')}</h3>
-                                <div style="width:100%; background:rgba(255,255,255,0.1); height:6px; border-radius:10px; overflow:hidden; margin:15px 0;">
-                                    <div style="width:${job.progress}%; height:100%; background:var(--accent); transition: width 0.5s ease;"></div>
+                            <div class="fade-in" style="text-align:center;">
+                                <div class="spinner" style="margin: 0 auto 32px; width: 80px; height: 80px; border: 2px solid rgba(255,255,255,0.05); border-top-color: var(--accent-gold); border-radius: 50%; animation: spin 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;"></div>
+                                <h3 class="font-serif" style="font-size: 2.5rem; margin-bottom: 12px; color: var(--accent-gold);">${escapeHTML(job.current_step || 'Processando...')}</h3>
+                                <div style="width:100%; max-width:400px; margin: 24px auto; background:rgba(255,255,255,0.03); height:1px; position:relative;">
+                                    <div style="width:${job.progress}%; height:1px; background:var(--accent-gold); position:absolute; left:0; top:0; transition: width 0.5s ease;"></div>
                                 </div>
-                                <p style="font-size:0.85rem; opacity:0.7;">Isso pode levar até 2 minutos devido à alta qualidade da IA.</p>
+                                <p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.2em; opacity:0.4;">Arquitetura de Marketing em andamento...</p>
                             </div>
                         `;
                     }
