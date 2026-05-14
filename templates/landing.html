@@ -3,175 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MKTPilot Pro | A Era da Inteligência de Marketing</title>
+    <title>MKTPilot Pro — Marketing Engineering Infrastructure</title>
     <link rel="stylesheet" href="/static/css/landing.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 <body>
 
-    <!-- Header -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <!-- Floating Header -->
     <header class="lp-header">
         <div class="logo-section">
             <div class="logo-box"></div>
-            <span>MKTPilot Pro</span>
+            <span style="letter-spacing: -0.05em;">MKTPilot <span style="font-weight: 400; opacity: 0.5;">Pro</span></span>
         </div>
         <nav>
             <ul class="nav-links">
-                <li><a href="#plataforma">Plataforma</a></li>
-                <li><a href="#modulos">Módulos</a></li>
-                <li><a href="#resultados">Resultados</a></li>
-                <li><a href="#precos">Empresas</a></li>
+                <li><a href="#infra">Infraestrutura</a></li>
+                <li><a href="#inteligencia">Inteligência</a></li>
+                <li><a href="#benchmarks">Benchmarks</a></li>
             </ul>
         </nav>
         <div class="cta-group">
-            <a href="/login" style="font-size: 0.9rem; font-weight: 600; color: var(--lp-text); text-decoration: none; margin-right: 24px;">Entrar</a>
-            <a href="/register" class="btn-pro btn-pro-primary" style="padding: 12px 24px; font-size: 0.85rem;">Começar Agora</a>
+            <a href="/login" class="btn-eng btn-eng-secondary" style="padding: 10px 20px; font-size: 0.85rem; border:none;">Login</a>
+            <a href="/register" class="btn-eng btn-eng-primary" style="padding: 10px 20px; font-size: 0.85rem;">Get Access</a>
         </div>
     </header>
 
     <!-- Hero Section -->
     <section class="hero">
-        <div class="container">
-            <div class="hero-tag">
-                <span style="background: var(--lp-accent); width: 8px; height: 8px; border-radius: 50%;"></span>
-                Nova Era: MKTPilot Pro v4.0 já disponível
+        <div style="max-width: 1200px; margin: 0 auto; padding: 0 24px;">
+            <span class="mono-label reveal">Architecture v4.2.0</span>
+            <h1 class="reveal" style="transition-delay: 0.1s;">A infraestrutura de <br><span style="color: var(--lp-accent);">Marketing Pro.</span></h1>
+            <p class="reveal" style="transition-delay: 0.2s;">O MKTPilot Pro não é um gerador de posts. É uma camada de engenharia que orquestra agentes de IA para dominar prospecção, mídia paga e SEO em escala industrial.</p>
+            <div class="reveal" style="transition-delay: 0.3s; display: flex; gap: 16px; justify-content: center;">
+                <a href="/register" class="btn-eng btn-eng-primary">Start Engineering</a>
+                <a href="#infra" class="btn-eng btn-eng-secondary">Documentation</a>
             </div>
-            <h1 class="text-gradient">A Engenharia por trás <br>do Marketing de Elite.</h1>
-            <p>Pare de gerenciar ferramentas e comece a orquestrar resultados. O MKTPilot Pro é a infraestrutura definitiva para agências e marcas que buscam escala industrial com IA.</p>
-            <div style="display: flex; gap: 16px; justify-content: center;">
-                <a href="/register" class="btn-pro btn-pro-primary">Falar com um Especialista</a>
-                <a href="#video" class="btn-pro btn-pro-secondary">Explorar Módulos</a>
+        </div>
+    </section>
+
+    <!-- Bento Grid 2.0 -->
+    <section id="infra" style="max-width: 1200px; margin: 0 auto; padding: 0 24px;">
+        <div class="bento-grid">
+            <div class="bento-item bento-main reveal">
+                <span class="mono-label">Kernel</span>
+                <h3 style="font-size: 2.5rem;">Aura Orchestrator</h3>
+                <p style="font-size: 1.1rem; max-width: 400px;">Nossa camada de decisão orquestra modelos LLM proprietários e open-source para garantir a melhor performance em cada canal.</p>
+                <div style="margin-top: auto; padding: 20px; background: #000; border-radius: 16px; color: #10b981; font-family: var(--mono); font-size: 0.75rem;">
+                    > Initializing campaign_agent... <br>
+                    > Analyzing competitor_data [DONE] <br>
+                    > Generating cross-platform_assets...
+                </div>
             </div>
             
-            <div style="margin-top: 80px; opacity: 0.4;">
-                <p style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 24px;">Confiado por agências líderes</p>
-                <div style="display: flex; gap: 60px; justify-content: center; font-weight: 800; font-size: 1.5rem; grayscale: 1;">
-                    <span>SaaSly</span> <span>GrowthCo</span> <span>NovaMedia</span> <span>EliteAds</span>
-                </div>
+            <div class="bento-item bento-side reveal">
+                <span class="mono-label">Prospecting</span>
+                <h3>Lead Hunter</h3>
+                <p>Enriquecimento de dados via Deep Web Scraping e análise de vulnerabilidade em tempo real.</p>
             </div>
-        </div>
-    </section>
-
-    <!-- Bento Grid Features -->
-    <section class="container" id="plataforma">
-        <div class="bento-grid">
-            <div class="bento-item bento-1">
-                <div style="margin-top: 40px;">
-                    <div style="font-size: 0.7rem; color: var(--lp-accent); font-weight: 700; margin-bottom: 12px; letter-spacing: 0.1em;">CORE ENGINE</div>
-                    <h3>Aura Orchestrator</h3>
-                    <p>Nossa IA não apenas escreve, ela pensa. Ela analisa o mercado em tempo real e orquestra campanhas multicanal com precisão cirúrgica.</p>
-                </div>
-                <div style="position: absolute; bottom: -20px; right: -20px; width: 300px; height: 200px; background: var(--lp-accent-soft); border-radius: 20px; border: 1px solid var(--lp-border);"></div>
-            </div>
-            <div class="bento-item bento-2">
+            
+            <div class="bento-item bento-side reveal">
+                <span class="mono-label">Creative</span>
                 <h3>Video Forge</h3>
-                <p>Gere vídeos virais de alta fidelidade para TikTok e Meta Ads em minutos.</p>
+                <p>Renderização de vídeos 4K otimizados para viralização algorítmica.</p>
             </div>
-            <div class="bento-item bento-3">
-                <div style="margin-top: 20px;">
-                    <div style="font-size: 2rem; margin-bottom: 16px;">🎯</div>
-                    <h3>Lead Hunter Enriched</h3>
-                    <p>O SDR digital que você sempre quis. Encontra, analisa e gera abordagens magnéticas para novos clientes automaticamente.</p>
-                </div>
-            </div>
-            <div class="bento-item bento-4">
-                <h3>Eva Brain</h3>
-                <p>Monitoramento de ROI e performance 24/7 com diagnósticos preditivos.</p>
-            </div>
-            <div class="bento-item bento-5">
-                <h3>SEO 2.0</h3>
-                <p>Otimize sua visibilidade para buscadores de IA como Perplexity e Claude.</p>
-            </div>
-        </div>
-    </section>
 
-    <!-- Deep Dive Showcase -->
-    <section class="showcase container" id="modulos">
-        <div class="showcase-row">
-            <div class="showcase-content">
-                <div style="color: var(--lp-accent); font-weight: 700; margin-bottom: 16px;">CAÇADOR DE VENDAS</div>
-                <h2>Prospecção em <br>Escala Industrial.</h2>
-                <p>Nosso Lead Hunter não é apenas um scraper. Ele analisa a saúde digital do prospect, identifica vulnerabilidades e gera um "Ninja Pitch" personalizado para cada contato.</p>
-                <ul style="list-style: none; margin-bottom: 32px;">
-                    <li style="margin-bottom: 12px; display: flex; gap: 12px;">✅ <strong>Deep Scraping:</strong> Google Maps & Web Data.</li>
-                    <li style="margin-bottom: 12px; display: flex; gap: 12px;">✅ <strong>Vulnerability Detection:</strong> Onde seu lead está falhando?</li>
-                    <li style="margin-bottom: 12px; display: flex; gap: 12px;">✅ <strong>One-Click Outreach:</strong> Integração com WhatsApp.</li>
-                </ul>
-                <a href="/register" class="btn-pro btn-pro-secondary">Ver em Ação</a>
-            </div>
-            <div class="showcase-image">
-                <!-- Visual mock of Lead Hunter -->
-                <div style="width: 80%; background: white; border-radius: 12px; box-shadow: 0 30px 60px rgba(0,0,0,0.05); padding: 20px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-                        <span style="font-weight: 700; font-size: 0.8rem;">Lead Hunter Dashboard</span>
-                        <span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.6rem;">Status: Hunting...</span>
+            <div class="bento-item bento-wide reveal">
+                <div style="flex: 1;">
+                    <span class="mono-label">Analytics</span>
+                    <h3 style="font-size: 2.5rem;">Eva Brain Monitoring</h3>
+                    <p>Diagnósticos preditivos que detectam quedas de performance antes que elas afetem seu caixa.</p>
+                </div>
+                <div style="display: flex; gap: 40px;">
+                    <div class="stat-card">
+                        <div class="stat-num">98%</div>
+                        <span class="mono-label">Accuracy</span>
                     </div>
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <div style="height: 40px; background: #f8fafc; border-radius: 6px; display: flex; align-items: center; padding: 0 10px; font-size: 0.7rem;">
-                            <strong>Odonto Pro</strong> — <span style="color: #ef4444; margin-left: 10px;">Vulnerabilidade: Baixo CTR</span>
-                        </div>
-                        <div style="height: 40px; background: #f8fafc; border-radius: 6px; display: flex; align-items: center; padding: 0 10px; font-size: 0.7rem;">
-                            <strong>Academia Fit</strong> — <span style="color: #ef4444; margin-left: 10px;">Vulnerabilidade: Sem anúncios ativos</span>
-                        </div>
+                    <div class="stat-card">
+                        <div class="stat-num">24/7</div>
+                        <span class="mono-label">Uptime</span>
                     </div>
                 </div>
             </div>
         </div>
+    </section>
 
-        <div class="showcase-row">
-            <div class="showcase-content">
-                <div style="color: var(--lp-accent); font-weight: 700; margin-bottom: 16px;">FÁBRICA DE MÍDIA</div>
-                <h2>Vídeos Virais <br>Garantidos por IA.</h2>
-                <p>Nossa Video Forge orquestra modelos como Wan 2.1 e Luma para criar criativos que parecem gravados por humanos, com roteiros validados psicologicamente.</p>
-                <a href="/register" class="btn-pro btn-pro-primary">Testar Agora</a>
-            </div>
-            <div class="showcase-image">
-                <div style="width: 280px; height: 180px; background: #000; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white;">
-                    <span>▶ Play Demo</span>
-                </div>
-            </div>
+    <!-- Final Section -->
+    <section style="background: #000; color: #fff; padding: 120px 0; border-radius: 48px 48px 0 0;">
+        <div style="max-width: 800px; margin: 0 auto; text-align: center; padding: 0 24px;">
+            <span class="mono-label" style="color: #6366f1;">Deployment</span>
+            <h2 style="font-size: 4rem; margin-bottom: 24px;">Pronto para <br>escalar?</h2>
+            <p style="color: #94a3b8; font-size: 1.2rem; margin-bottom: 48px;">Entre para a rede de agências e marcas que operam com MKTPilot Pro.</p>
+            <a href="/register" class="btn-eng btn-eng-primary" style="background: #fff; color: #000;">Create Pro Account</a>
         </div>
     </section>
 
-    <!-- Stats Bar -->
-    <section class="container" id="resultados">
-        <div class="stats-bar">
-            <div class="stat-item">
-                <h4>92%</h4>
-                <span>Automação de Fluxo</span>
-            </div>
-            <div class="stat-item">
-                <h4>3.5x</h4>
-                <span>Média de ROI (ROAS)</span>
-            </div>
-            <div class="stat-item">
-                <h4>< 5m</h4>
-                <span>Geração de Campanha</span>
-            </div>
-            <div class="stat-item">
-                <h4>1M+</h4>
-                <span>Leads Analisados</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- Final CTA Section -->
-    <section class="container">
-        <div class="cta-final">
-            <h2>Pronto para liderar <br>a nova era?</h2>
-            <p>Entre para o grupo exclusivo de marcas que já operam com infraestrutura Pro.</p>
-            <div style="display: flex; gap: 16px; justify-content: center;">
-                <a href="/register" class="btn-pro btn-pro-primary" style="background: white; color: black;">Criar Conta Gratuita</a>
-                <a href="#" class="btn-pro" style="color: white; border: 1px solid rgba(255,255,255,0.2);">Agendar Consultoria</a>
-            </div>
-        </div>
-    </section>
-
-    <footer class="container" style="padding: 100px 0; text-align: center; border-top: 1px solid var(--lp-border);">
-        <div style="font-weight: 800; font-size: 1.2rem; margin-bottom: 24px;">MKTPilot Pro</div>
-        <p style="color: var(--lp-muted); font-size: 0.9rem;">&copy; 2026 MKTPilot Architecture. Built for the elite.</p>
+    <footer style="padding: 60px 0; text-align: center; border-top: 1px solid var(--lp-border); font-size: 0.8rem; color: var(--lp-muted);">
+        <p>MKTPilot Pro &copy; 2026. Marketing Engineering Standard.</p>
     </footer>
+
+    <script>
+        // Reveal Logic (Zero Vibe Coding - Smooth Interaction)
+        const observerOptions = { threshold: 0.1 };
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    </script>
 
 </body>
 </html>
