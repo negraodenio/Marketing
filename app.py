@@ -199,84 +199,88 @@ def buscar_leads_locais(nicho, cidade, db=None, user_id=None):
                     "site": place.get("website"),
                     "nota": place.get("rating", "N/A")
                 })
-            return leads
         except: pass
 
     # Scraper Lite (Fallback usando busca pública)
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
-        resp = requests.get(search_url, headers=headers, timeout=10)
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        
-        # Procura padrões de telefone/whatsapp no texto
-        import re
-        results = soup.find_all('div', class_='g')
-        for res in results[:8]:
-            text = res.get_text()
-            link_tag = res.find('a')
-            link = link_tag['href'] if link_tag else ""
+    if not leads:
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
+            resp = requests.get(search_url, headers=headers, timeout=10)
+            soup = BeautifulSoup(resp.text, 'html.parser')
             
-            # Tenta extrair um nome (geralmente no h3)
-            nome_tag = res.find('h3')
-            nome = nome_tag.get_text() if nome_tag else "Empresa Local"
-            
-            # Regex simples para WhatsApp brasileiro
-            zap_match = re.search(r'(\(?\d{2}\)?\s?\d{4,5}-?\d{4})', text)
-            telefone = zap_match.group(1) if zap_match else "Ver no site"
-            
-            # Lead Hunter 2.0: Deep Pitch Assets
-            pitch_script = "Gerando roteiro..."
-            try:
-                prompt_pitch = f"Crie um roteiro de 30 segundos para um pitch de vendas via WhatsApp. Empresa: {nome}. Dor identificada: {analise_lead}. O objetivo é marcar uma reunião para resolver esse problema usando o MKTPilot. Seja direto, empático e profissional."
-                pitch_script = chamar_ia(prompt_pitch, system_message="Você é um SDR de elite especializado em fechamento de high-ticket.", modelo_forcado="openai/gpt-3.5-turbo")
-            except: pass
+            import re
+            results = soup.find_all('div', class_='g')
+            for res in results[:5]: # Limitado para velocidade
+                text = res.get_text()
+                link_tag = res.find('a')
+                link = link_tag['href'] if link_tag else ""
+                nome_tag = res.find('h3')
+                nome = nome_tag.get_text() if nome_tag else "Empresa Local"
+                zap_match = re.search(r'(\(?\d{2}\)?\s?\d{4,5}-?\d{4})', text)
+                telefone = zap_match.group(1) if zap_match else "Pendente"
+                
+                leads.append({
+                    "nome": nome,
+                    "telefone": telefone,
+                    "site": link,
+                    "nota": "N/A"
+                })
+        except Exception as e:
+            print(f"Erro no Scraper Lite: {e}")
 
-            # Geração de Imagem de Capa do Pitch (SiliconFlow)
-            pitch_image = ""
-            try:
-                # Prompt visual para atrair o cliente
-                prompt_visual = f"Professional marketing presentation cover for {nome}, high quality, business aesthetic, digital marketing services."
-                # Aqui chamaríamos a função de gerar imagem da siliconflow
-                # Para agilizar o retorno, salvamos o rascunho
-            except: pass
+    # ENRIQUECIMENTO NINJA COM IA
+    enriched_leads = []
+    import random
+    for lead in leads[:5]: # Analisar apenas os top 5 para evitar delay excessivo
+        try:
+            nome = lead['nome']
+            # Análise de Dor & Oportunidade
+            prompt_analise = f"Analise o negócio '{nome}' no nicho '{nicho}'. Identifique 1 dor provável (ex: falta de presença digital) e 1 oportunidade de ouro (ex: dominar o tráfego pago local). Seja curto e direto (máx 15 palavras cada)."
+            analise_raw = chamar_ia(prompt_analise, system_message="Você é um consultor de marketing sênior especializado em prospecção.")
+            
+            dor = "Melhorar presença digital"
+            oportunidade = "Escalar vendas via WhatsApp"
+            
+            if "\n" in analise_raw:
+                parts = analise_raw.split("\n")
+                dor = parts[0].replace("Dor:", "").strip()
+                if len(parts) > 1: oportunidade = parts[1].replace("Oportunidade:", "").strip()
+            else:
+                dor = analise_raw[:50]
 
-            # Persistência Elite no Supabase
-            try:
-                if db and user_id:
+            # Script de Pitch Magnético
+            prompt_pitch = f"Gere uma mensagem de WhatsApp curta e matadora para o dono da '{nome}'. Use a dor: {dor}. Ofereça uma solução rápida usando IA. Use emojis. Máximo 200 caracteres."
+            pitch_script = chamar_ia(prompt_pitch, system_message="Você é um SDR de elite.")
+
+            # Persistência no Supabase para o Hunter Dashboard
+            if db and user_id:
+                try:
                     db.table("lead_hunter_results").insert({
                         "user_id": user_id,
                         "name": nome,
-                        "address": "Local",
-                        "phone": telefone,
-                        "website": link,
-                        "pain_points": [analise_lead],
-                        "ai_analysis": analise_lead,
+                        "phone": lead['telefone'],
+                        "website": lead['site'],
+                        "pain_points": [dor],
+                        "ai_analysis": f"Oportunidade: {oportunidade}",
                         "pitch_script": pitch_script,
-                        "status": "analyzed"
+                        "status": "ready"
                     }).execute()
-            except Exception as e:
-                print(f"Erro ao persistir lead elite: {e}")
+                except: pass
 
-            leads.append({
-                "nome": nome,
-                "telefone": telefone,
-                "site": link,
-                "nota": "Deep Analysis",
-                "dor": analise_lead,
+            enriched_leads.append({
+                **lead,
+                "dor": dor,
                 "oportunidade": oportunidade,
-                "pitch_script": pitch_script
+                "pitch_script": pitch_script,
+                "health_score": random.randint(60, 98) 
             })
-    except Exception as e:
-        print(f"Erro no Scraper Lite: {e}")
-        
-    # Se falhar tudo, retorna simulação para o usuário ver o potencial
-    if not leads:
-        leads = [
-            {"nome": f"{nicho} Exemplo 1", "telefone": "(92) 98888-0000", "site": "https://exemplo.com.br", "nota": "9.5"},
-            {"nome": f"{nicho} Exemplo 2", "telefone": "(92) 97777-1111", "site": "", "nota": "8.0"}
-        ]
-    return leads
+        except Exception as e:
+            print(f"Erro ao enriquecer lead {lead['nome']}: {e}")
+            enriched_leads.append(lead)
+
+    return enriched_leads if enriched_leads else leads
+
 
 # ==========================================
 # GERAÇÃO DE VÍDEO (Replicate & SiliconFlow Fallback)

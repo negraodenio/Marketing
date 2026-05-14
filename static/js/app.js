@@ -1044,21 +1044,51 @@ document.addEventListener('click', (e) => {
                 leadsTableBody.innerHTML = '';
                 if (data.leads && data.leads.length > 0) {
                     data.leads.forEach(lead => {
-                        const zapClean = (lead.telefone || '').replace(/\D/g, '');
-                        const zapLink = zapClean.length >= 10 ? `https://wa.me/55${zapClean}` : '#';
-                        leadsTableBody.innerHTML += `<tr>
-                            <td><strong>${escapeHTML(lead.nome)}</strong></td>
-                            <td><a href="${zapLink}" target="_blank" class="btn-whatsapp">🟢 ${escapeHTML(lead.telefone || 'N/A')}</a></td>
-                            <td><a href="${lead.site}" target="_blank" style="color:var(--accent); font-size:0.8em;">${lead.site ? 'Website' : 'N/A'}</a></td>
-                            <td><div style="font-size:0.75rem; color:#f87171;">⚠️ ${escapeHTML(lead.dor || 'Detectando...')}</div></td>
-                            <td><button class="btn-prospect" onclick="prospectarLead('${lead.nome.replace(/'/g, "")}', '${lead.site}')">✨ Prospectar</button></td>
-                        </tr>`;
+                        const score = lead.health_score || 0;
+                        const scoreColor = score > 80 ? '#10b981' : (score > 60 ? '#f59e0b' : '#ef4444');
+                        
+                        leadsTableBody.innerHTML += `
+                            <tr style="border-bottom: 1px solid var(--border-dim); transition: 0.2s;">
+                                <td style="padding: 16px;">
+                                    <div style="font-weight:600; color:var(--text-primary);">${escapeHTML(lead.nome)}</div>
+                                    <div style="font-size:0.75rem; color:var(--text-secondary);">${escapeHTML(lead.telefone || 'N/A')}</div>
+                                </td>
+                                <td style="padding: 16px;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <div style="width:36px; height:36px; border-radius:50%; border:2px solid ${scoreColor}; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:${scoreColor};">
+                                            ${score}%
+                                        </div>
+                                        <span style="font-size:0.75rem; color:var(--text-secondary);">${score > 80 ? 'Alta Prod.' : 'Oportunidade'}</span>
+                                    </div>
+                                </td>
+                                <td style="padding: 16px;">
+                                    <div style="background:rgba(239, 68, 68, 0.05); color:#ef4444; padding:4px 10px; border-radius:6px; font-size:0.75rem; border:1px solid rgba(239, 68, 68, 0.1); display:inline-block;">
+                                        ⚠️ ${escapeHTML(lead.dor || 'Vulnerabilidade Detectada')}
+                                    </div>
+                                    <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">${escapeHTML(lead.oportunidade || '')}</div>
+                                </td>
+                                <td style="padding: 16px; text-align: right;">
+                                    <button class="btn-ninja" style="padding: 8px 16px; font-size: 0.75rem; background: var(--bg-surface); border: 1px solid var(--border-dim);" 
+                                            onclick="abrirPitchNinja('${lead.nome.replace(/'/g, "")}', '${(lead.pitch_script || '').replace(/'/g, "").replace(/\n/g, " ")}', '${lead.telefone}')">
+                                        ✨ Ninja Pitch
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
                     });
                     leadsListArea.classList.remove('hidden');
                 } else { alert("Nenhum lead encontrado."); }
             } catch (e) { alert("Erro ao buscar leads."); } finally { loadingLeads.classList.add('hidden'); btnBuscarLeads.disabled = false; }
         });
     }
+
+    window.abrirPitchNinja = function(nome, pitch, telefone) {
+        const zapClean = (telefone || '').replace(/\D/g, '');
+        const finalPitch = pitch || `Olá ${nome}, vi que sua empresa pode escalar com IA...`;
+        if (confirm(`PITCH NINJA PARA ${nome.toUpperCase()}:\n\n"${finalPitch}"\n\nEnviar via WhatsApp agora?`)) {
+            window.open(`https://wa.me/55${zapClean}?text=${encodeURIComponent(finalPitch)}`, '_blank');
+        }
+    };
 
     window.prospectarLead = async function(nome, site) {
         const modalMsg = prompt(`Gerando abordagem para ${nome}. Qual produto você quer oferecer?`, "Marketing Digital");

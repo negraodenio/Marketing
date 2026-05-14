@@ -81,7 +81,7 @@
                         <span>Eva Oracle</span>
                     </a>
                     <a href="#" class="nav-link" data-tab="leads">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>
                         <span>Lead Hunter</span>
                     </a>
                 </nav>
@@ -242,16 +242,50 @@
                     </div>
                 </section>
 
-                <!-- TAB: HISTORY -->
-                <section id="tab-history" class="tab-pane hidden fade-in">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
-                        <h2 style="font-size: 1.5rem;">Repositório de Campanhas</h2>
-                        <button id="btnLoadHistory" class="btn-ninja" style="background: transparent; border: 1px solid var(--border-dim); padding: 8px 16px; font-size: 0.8rem;">Sincronizar</button>
+                <!-- TAB: LEAD HUNTER (NINJA MODE) -->
+                <section id="tab-leads" class="tab-pane hidden fade-in">
+                    <div class="dashboard-header" style="margin-bottom: 32px;">
+                        <h1 style="font-size: 2rem;">Lead Hunter <span style="color: var(--accent-primary);">Enriched</span></h1>
+                        <p style="color: var(--text-secondary);">Prospecção inteligente com análise de vulnerabilidade via IA.</p>
                     </div>
-                    <div id="historyList" class="pro-grid"></div>
-                </section>
 
-                <!-- Outras Abas seguem o mesmo padrão Pro... -->
+                    <div class="pro-card" style="margin-bottom: 24px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; align-items: flex-end;">
+                            <div class="input-group" style="margin-bottom:0;">
+                                <label class="input-label">Nicho de Mercado</label>
+                                <input type="text" id="leadNicho" class="input-pro" placeholder="Ex: Dentistas, Academias...">
+                            </div>
+                            <div class="input-group" style="margin-bottom:0;">
+                                <label class="input-label">Localização</label>
+                                <input type="text" id="leadCidade" class="input-pro" placeholder="Ex: São Paulo, SP">
+                            </div>
+                            <button id="btnBuscarLeads" class="btn-ninja" style="height: 48px;">Caçar Leads</button>
+                        </div>
+                    </div>
+
+                    <div id="loadingLeads" class="hidden" style="text-align: center; padding: 40px;">
+                        <div style="width: 32px; height: 32px; border: 2px solid var(--border-dim); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Infiltrando no Google Maps & Analisando Presença Digital...</p>
+                    </div>
+
+                    <div id="leadsListArea" class="hidden">
+                        <div class="pro-card" style="padding: 0; overflow: hidden;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                                <thead style="background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-dim);">
+                                    <tr>
+                                        <th style="padding: 16px; text-align: left;">Empresa</th>
+                                        <th style="padding: 16px; text-align: left;">Saúde AI</th>
+                                        <th style="padding: 16px; text-align: left;">Vulnerabilidade</th>
+                                        <th style="padding: 16px; text-align: right;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leadsTableBody">
+                                    <!-- Leads Enriched results -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
             </div>
         </main>
 
