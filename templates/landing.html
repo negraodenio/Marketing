@@ -19,7 +19,7 @@
             <ul class="nav-links">
                 <li><a href="#infra">Infra</a></li>
                 <li><a href="#inteligencia">Inteligência</a></li>
-                <li><a href="/login">Login</a></li>
+                <li><a href="#ecosistema">Ecossistema</a></li>
             </ul>
         </nav>
         <a href="/register" class="btn-eng btn-eng-primary" style="padding: 8px 16px;">Access</a>
@@ -37,9 +37,10 @@
         </div>
     </section>
 
+    <!-- Bento Grid Expandido -->
     <section id="infra" class="container">
-        <div class="bento-grid">
-            <!-- Main Engine -->
+        <div class="bento-grid" style="grid-auto-rows: 180px;">
+            <!-- Aura -->
             <div class="bento-item bento-main">
                 <span class="mono-label">Core Engine</span>
                 <h3>Aura Orchestrator</h3>
@@ -51,7 +52,7 @@
                 </div>
             </div>
             
-            <!-- Side: Video -->
+            <!-- Video -->
             <div class="bento-item bento-side">
                 <span class="mono-label">Creative Forge</span>
                 <h3>Video Forge</h3>
@@ -61,15 +62,29 @@
                 </div>
             </div>
             
-            <!-- Side: Leads -->
+            <!-- Leads -->
             <div class="bento-item bento-side">
                 <span class="mono-label">Prospecting</span>
                 <h3>Lead Hunter</h3>
                 <p>Scraping profundo com análise de vulnerabilidade e scripts magnéticos.</p>
             </div>
 
+            <!-- NOVO: Autopilot -->
+            <div class="bento-item bento-side" style="background: #f8fafc;">
+                <span class="mono-label">Automation</span>
+                <h3>Autopilot 24/7</h3>
+                <p>Otimização de campanhas em background enquanto você dorme.</p>
+            </div>
+
+            <!-- NOVO: Spy Mode -->
+            <div class="bento-item bento-side">
+                <span class="mono-label">Intelligence</span>
+                <h3>Competitor Watch</h3>
+                <p>Radar em tempo real para monitorar mudanças nos sites de concorrentes.</p>
+            </div>
+
             <!-- Wide: Analytics -->
-            <div class="bento-item bento-wide">
+            <div class="bento-item bento-wide" style="grid-row: span 1.2;">
                 <div style="flex: 1;">
                     <span class="mono-label">Analytics</span>
                     <h3>Eva Brain Monitoring</h3>
@@ -80,16 +95,51 @@
                         <div class="stat-num">98%</div>
                         <span class="mono-label">Accuracy</span>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-num">24/7</div>
-                        <span class="mono-label">Uptime</span>
-                    </div>
                 </div>
+            </div>
+
+            <!-- NOVO: SEO AI -->
+            <div class="bento-item bento-main" style="grid-column: span 6;">
+                <span class="mono-label">Visibility</span>
+                <h3>SEO Engine 2.0</h3>
+                <p>Otimização técnica focada em buscadores de IA (Perplexity, Claude, Gemini). Não apareça apenas no Google, apareça na resposta da IA.</p>
+            </div>
+
+            <!-- NOVO: Marketplace -->
+            <div class="bento-item bento-main" style="grid-column: span 6; background: linear-gradient(135deg, #fff 0%, #f5f3ff 100%);">
+                <span class="mono-label">Collaborative</span>
+                <h3>Marketplace Pro</h3>
+                <p>Acesse e compartilhe arquiteturas de campanhas vencedoras validadas pela comunidade MKTPilot.</p>
             </div>
         </div>
     </section>
 
-    <section class="container">
+    <!-- Seção de Ecossistema -->
+    <section id="ecosistema" class="container" style="padding-top: 60px;">
+        <div style="text-align: center; margin-bottom: 48px;">
+            <span class="mono-label">Global Scale</span>
+            <h2 style="font-size: 2.5rem;">Um ecossistema sem limites.</h2>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; text-align: center;">
+            <div class="bento-item" style="padding: 32px;">
+                <div style="font-size: 1.5rem; margin-bottom: 12px;">🌍</div>
+                <h4 style="margin-bottom: 8px;">Multi-Idioma</h4>
+                <p style="font-size: 0.75rem;">Campanhas globais em +40 idiomas nativos.</p>
+            </div>
+            <div class="bento-item" style="padding: 32px;">
+                <div style="font-size: 1.5rem; margin-bottom: 12px;">🛡️</div>
+                <h4 style="margin-bottom: 8px;">Hardened Security</h4>
+                <p style="font-size: 0.75rem;">Proteção de dados nível Enterprise com Supabase.</p>
+            </div>
+            <div class="bento-item" style="padding: 32px;">
+                <div style="font-size: 1.5rem; margin-bottom: 12px;">⚡</div>
+                <h4 style="margin-bottom: 8px;">Ultra Latência</h4>
+                <p style="font-size: 0.75rem;">Processamento via CDN global para respostas instantâneas.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="container" style="margin-top: 80px;">
         <div class="cta-final">
             <h2>Pronto para escalar?</h2>
             <p>Entre para a rede de elite que opera com MKTPilot Pro.</p>
