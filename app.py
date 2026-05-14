@@ -654,17 +654,17 @@ RETORNE APENAS O JSON seguindo rigorosamente esta estrutura:
         system_msg = "Você é o motor de IA do MKTPilot Pro. Sua saída é puramente JSON técnico de marketing de alta conversão. Não responda com texto explicativo."
         resposta_bruta = chamar_ia(prompt, system_message=system_msg, modelo_forcado=OPENROUTER_MODEL)
         
-        import re, json
         def extrair_json_do_texto(texto):
             if not texto: return None
-            # Limpeza agressiva
-            texto = re.sub(r'```json\s*', '', texto); texto = re.sub(r'```\s*', '', texto)
+            # Limpeza agressiva usando os imports globais
+            texto_limpo = re.sub(r'```json\s*', '', texto)
+            texto_limpo = re.sub(r'```\s*', '', texto_limpo)
             try:
                 # Tenta encontrar o bloco JSON mais externo
-                start = texto.find('{')
-                end = texto.rfind('}') + 1
+                start = texto_limpo.find('{')
+                end = texto_limpo.rfind('}') + 1
                 if start != -1 and end != 0:
-                    return json.loads(texto[start:end])
+                    return json.loads(texto_limpo[start:end])
                 return None
             except: return None
 
