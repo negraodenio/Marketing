@@ -684,22 +684,37 @@ RETORNE APENAS O JSON seguindo rigorosamente esta estrutura:
         
         def extrair_json_do_texto(texto):
             if not texto: return None
-            # Limpeza agressiva usando os imports globais
-            texto_limpo = re.sub(r'```json\s*', '', texto)
+            if "Falha na conexão" in texto or "Erro na estrutura" in texto:
+                raise Exception(texto) # Repassa o erro da IA
+                
+            # Limpeza profunda
+            texto_limpo = texto.strip()
+            # Remove blocos de código markdown
+            texto_limpo = re.sub(r'```json\s*', '', texto_limpo)
             texto_limpo = re.sub(r'```\s*', '', texto_limpo)
+            
             try:
-                # Tenta encontrar o bloco JSON mais externo
+                # Localiza o objeto JSON mais externo
                 start = texto_limpo.find('{')
                 end = texto_limpo.rfind('}') + 1
-                if start != -1 and end != 0:
-                    return json.loads(texto_limpo[start:end])
+                if start == -1 or end <= start:
+                    return None
+                    
+                json_str = texto_limpo[start:end]
+                
+                # Correções comuns de LLM (vírgulas extras, quebras de linha em strings)
+                # Remove vírgulas antes de fechamento de objeto/array
+                json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
+                
+                return json.loads(json_str)
+            except Exception as e:
+                print(f"⚠️ Erro no parsing secundário: {e}")
                 return None
-            except: return None
 
         campaign_data = extrair_json_do_texto(resposta_bruta)
         if not campaign_data:
-            print(f"❌ Erro ao decodificar JSON da IA: {resposta_bruta[:500]}", flush=True)
-            raise Exception("A IA gerou um formato inválido. Tente novamente.")
+            print(f"❌ Erro Crítico de Formato. Resposta da IA:\n{resposta_bruta}", flush=True)
+            raise Exception("A IA se confundiu na estrutura. Clique em 'Gerar' novamente para recalibrar.")
 
         update_job(progress=40, step="Polindo textos e preparando artes...")
         campaign_data = revisar_campanha_completa(campaign_data)
