@@ -617,25 +617,61 @@ def process_campaign_job(job_id, user_id, dados):
             if texto_concorrente:
                 contexto_spy = f"\n\nATENÇÃO (Análise de Concorrência):\nSite do concorrente: \"{texto_concorrente[:1500]}\""
 
-        # 2. Geração de Copy (IA)
-        prompt = f"""Crie uma campanha de alto impacto para "{produto}" ({nicho}) - Objetivo: {objetivo}.{contexto_spy}
-Variações: A (Ganho), B (Medo), C (Curiosidade).
-Tom: {tom_de_voz}. Público: {publico_alvo}. Plataforma: {plataforma}.
-Retorne APENAS JSON."""
+        # 2. Geração de Copy (IA) - SCHEMA ENFORCEMENT
+        schema = {
+            "facebook_ad": {
+                "headline_a": "...", "headline_b": "...", "headline_c": "...",
+                "primary_text_a": "...", "primary_text_b": "...", "primary_text_c": "...",
+                "cta": "Saiba Mais"
+            },
+            "instagram_posts": [
+                {"caption": "...", "hashtags": "#..."},
+                {"caption": "...", "hashtags": "#..."}
+            ],
+            "email": {
+                "subject_a": "...", "subject_b": "...",
+                "body_a": "...", "body_b": "..."
+            },
+            "video_script": {
+                "hook": "...", "body": "...", "cta": "..."
+            }
+        }
+
+        prompt = f"""Crie uma campanha de marketing completa e de alto nível para o produto "{produto}".
+Nicho: {nicho}. Objetivo: {objetivo}.{contexto_spy}
+Público-alvo: {publico_alvo}. Tom de voz: {tom_de_voz}.
+Plataforma principal: {plataforma}.
+
+INSTRUÇÕES OBRIGATÓRIAS:
+1. Gere 3 variações de Meta Ads (A: Foco em Ganho, B: Foco em Medo/Urgência, C: Foco em Curiosidade).
+2. Gere 2 posts estratégicos para Instagram com legendas magnéticas.
+3. Gere um script de vídeo curto (Reels/TikTok) com Hook, Body e CTA.
+4. Gere uma sequência de e-mail marketing (2 variações).
+
+RETORNE APENAS O JSON seguindo rigorosamente esta estrutura:
+{json.dumps(schema, indent=2)}"""
         
-        system_msg = "Você é uma API de marketing. Retorne APENAS JSON válido."
+        system_msg = "Você é o motor de IA do MKTPilot Pro. Sua saída é puramente JSON técnico de marketing de alta conversão. Não responda com texto explicativo."
         resposta_bruta = chamar_ia(prompt, system_message=system_msg, modelo_forcado=OPENROUTER_MODEL)
         
         import re, json
         def extrair_json_do_texto(texto):
             if not texto: return None
+            # Limpeza agressiva
             texto = re.sub(r'```json\s*', '', texto); texto = re.sub(r'```\s*', '', texto)
-            match = re.search(r'(\{.*\})', texto, re.DOTALL)
-            return json.loads(match.group(1)) if match else None
+            try:
+                # Tenta encontrar o bloco JSON mais externo
+                start = texto.find('{')
+                end = texto.rfind('}') + 1
+                if start != -1 and end != 0:
+                    return json.loads(texto[start:end])
+                return None
+            except: return None
 
         campaign_data = extrair_json_do_texto(resposta_bruta)
         if not campaign_data:
-            raise Exception("IA falhou ao gerar JSON válido.")
+            print(f"❌ Erro ao decodificar JSON da IA: {resposta_bruta[:500]}", flush=True)
+            raise Exception("A IA gerou um formato inválido. Tente novamente.")
 
         update_job(progress=40, step="Polindo textos e preparando artes...")
         campaign_data = revisar_campanha_completa(campaign_data)
