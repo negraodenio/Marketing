@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True) # Carrega as chaves antes de tudo
 
 from routes.modules import modules_bp
+from routes.seo_engine import seo_bp
 import requests
 import json
 import asyncio
@@ -16,6 +17,7 @@ from datetime import datetime, timedelta
 # load_dotenv removido daqui
 app = Flask(__name__)
 app.register_blueprint(modules_bp)
+app.register_blueprint(seo_bp)
 
 # ==========================================
 # CONFIGURAÇÕES E SUPABASE
@@ -416,7 +418,7 @@ def chamar_ia(prompt, system_message="Você é um assistente de marketing especi
     payload = {
         "model": modelo_final,
         "messages": [
-            {"role": "system", "content": system_message},
+            {"role": "system", "content": system_message + "\n\nIMPORTANTE: Use Markdown estruturado (headers, listas, negrito) para garantir que este conteúdo seja perfeitamente legível por sistemas de AI Search (Perplexity, ChatGPT, Claude)."},
             {"role": "user", "content": prompt}
         ]
     }

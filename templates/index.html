@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AURA AI Premium</title>
-    <meta name="description" content="Crie campanhas, anuncios, textos, imagens e roteiros com inteligencia artificial em poucos segundos.">
+    <title>AURA AI Premium - Marketing de Elite com IA</title>
+    <meta name="description" content="AURA AI é a plataforma líder em automação de marketing com IA. Crie campanhas, vídeos e anúncios otimizados para motores de busca e AI Search engines como Perplexity e Claude.">
+    <meta name="keywords" content="marketing ia, inteligência artificial marketing, seo ai, perplexity seo, claude marketing, vibecoding">
+    <meta property="og:title" content="AURA AI Premium - Sua Presença Digital Otimizada">
+    <meta property="og:description" content="O seu app publicado agora é legível pelo Google, pelo ChatGPT e pelo Claude desde o primeiro segundo.">
+    <meta property="og:type" content="website">
+    <meta name="robots" content="index, follow">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@1,400;1,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
     <!-- Scripts movidos para o head com DEFER para carregamento prioritário e anti-cache -->
-    <script src="/static/js/modules.js?v=2.1" defer></script>
-    <script src="/static/js/app.js?v=2.1" defer></script>
+    <script src="/static/js/modules.js?v=2.2" defer></script>
+    <script src="/static/js/app.js?v=2.2" defer></script>
     <script>console.log("🛠️ HTML: Scripts registrados no Head.");</script>
 </head>
 <body>
@@ -179,6 +184,11 @@
                         <h3 style="font-size: 0.85rem; font-weight: 600;">Hooks Virais</h3>
                         <p style="font-size: 10px; opacity: 0.4;">Ganchos que convertem.</p>
                     </div>
+                    <div class="module-card" onclick="switchTab('tab-seo')">
+                        <div style="font-size: 1.5rem; margin-bottom: 10px;">🔍</div>
+                        <h3 style="font-size: 0.85rem; font-weight: 600;">SEO & AI Audit</h3>
+                        <p style="font-size: 10px; opacity: 0.4;">Legibilidade total.</p>
+                    </div>
                 </div>
 
                 <!-- Main Preview Card -->
@@ -212,15 +222,23 @@
                 </div>
 
                 <div class="wizard-container glass-panel" style="margin-top: 3rem;">
-                    <!-- Indicador de Progresso -->
+                    <!-- Indicador de Progresso (Guia Interativo) -->
                     <div class="wizard-progress">
-                        <div class="progress-step active" data-step="1"><span>1</span> Onde?</div>
-                        <div class="progress-line"></div>
-                        <div class="progress-step" data-step="2"><span>2</span> Negócio</div>
-                        <div class="progress-line"></div>
-                        <div class="progress-step" data-step="3"><span>3</span> Produto</div>
-                        <div class="progress-line"></div>
-                        <div class="progress-step" data-step="4"><span>4</span> Objetivo</div>
+                        <div class="progress-line-fill" id="stepLineFill"></div>
+                        <div class="progress-step active" id="pstep-1" onclick="goToStep(1)"><span>1</span> Onde</div>
+                        <div class="progress-step" id="pstep-2" onclick="goToStep(2)"><span>2</span> Negócio</div>
+                        <div class="progress-step" id="pstep-3" onclick="goToStep(3)"><span>3</span> Produto</div>
+                        <div class="progress-step" id="pstep-4" onclick="goToStep(4)"><span>4</span> Mercado</div>
+                        <div class="progress-step" id="pstep-5" onclick="goToStep(5)"><span>5</span> Objetivo</div>
+                    </div>
+
+                    <!-- Guia para o Usuário -->
+                    <div id="stepGuide" class="step-guide-box">
+                        <div class="icon">💡</div>
+                        <div class="text">
+                            <h4 id="guideTitle">Passo 1: Escolha a Plataforma</h4>
+                            <p id="guideDesc">Selecione onde você deseja que sua campanha seja exibida para otimizarmos o formato.</p>
+                        </div>
                     </div>
 
                     <!-- Step 1 -->
@@ -296,11 +314,31 @@
                             <input type="url" id="wizConcorrente" placeholder="Ex: https://site-do-concorrente.com" class="wizard-input" style="border-color: #3b82f6;">
                             <small style="opacity:0.6;">A IA vai analisar o site e criar algo superior.</small>
                         </div>
-                        <button class="btn-primary" onclick="nextWizard(4)">Próximo →</button>
+                        <button class="btn-primary" onclick="generateMarketIntelligence()">Analisar Mercado & SEO →</button>
                     </div>
 
-                    <!-- Step 4 -->
+                    <!-- Step 4: Market Intelligence (Semrush Style) -->
                     <div id="wiz-step-4" class="wizard-step hidden">
+                        <h3>Inteligência de Mercado & SEO</h3>
+                        <p class="subtitle">Analisamos seu nicho para encontrar as melhores oportunidades.</p>
+                        
+                        <div id="marketDataArea" class="market-intelligence-grid">
+                            <!-- Preenchido via JS -->
+                            <div class="loading-mini"><div class="spinner-small"></div> Analisando dados da Semrush...</div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 20px;">
+                            <label>Palavras-chave selecionadas para o SEO:</label>
+                            <div id="selectedKeywords" class="keyword-tags">
+                                <!-- Preenchido via JS -->
+                            </div>
+                        </div>
+
+                        <button class="btn-primary" onclick="nextWizard(5)">Confirmar Objetivo →</button>
+                    </div>
+
+                    <!-- Step 5 -->
+                    <div id="wiz-step-5" class="wizard-step hidden">
                         <h3>Qual o seu objetivo principal?</h3>
                         <p class="subtitle">Escolha o que mais importa para você agora.</p>
                         <div class="objective-cards">
@@ -321,6 +359,49 @@
 
                     <!-- Resultado Final -->
                     <div id="resultadoCopilot" class="resultado-box markdown-body hidden" style="margin-top: 20px;"></div>
+                    
+                    <!-- SEO Review Overlay (Aparece após gerar) -->
+                    <div id="seoReviewPanel" class="seo-review-panel hidden">
+                        <div class="seo-header">
+                            <h3>🔍 SEO & AI Visibility Review</h3>
+                            <button class="btn-close-seo" onclick="toggleSeoPanel()">×</button>
+                        </div>
+                        <div id="seoMetrics" class="seo-metrics-grid">
+                            <div class="metric">
+                                <span class="label">SEO Score</span>
+                                <div class="progress-bar"><div id="seoScoreBar" class="fill"></div></div>
+                                <span id="seoScoreVal" class="value">0%</span>
+                            </div>
+                            <div class="metric">
+                                <span class="label">AI Search Ready</span>
+                                <div class="progress-bar"><div id="aiVisibilityBar" class="fill"></div></div>
+                                <span id="aiVisibilityVal" class="value">0%</span>
+                            </div>
+                        </div>
+                        <div id="seoIssuesList" class="seo-issues-list">
+                            <!-- Issues preenchidas via JS -->
+                        </div>
+                        <button id="btnFixSeo" class="btn-fix-seo">🚀 Corrigir tudo em 1 clique</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA SEO & AI AUDIT -->
+            <section id="tab-seo" class="tab-pane hidden fade-in">
+                <header class="dashboard-header">
+                    <h1>🔍 SEO & AI Search Audit</h1>
+                    <p>Garanta que sua marca seja encontrada por humanos e inteligências artificiais.</p>
+                </header>
+                <div class="glass-panel" style="padding: 30px;">
+                    <div class="form-group">
+                        <label>Cole o seu copy para auditoria:</label>
+                        <textarea id="seoAuditInput" class="wizard-input" style="height: 200px;" placeholder="Cole o texto que deseja analisar..."></textarea>
+                    </div>
+                    <button id="btnRunAudit" class="btn-primary" style="margin-top: 20px;">🚀 Iniciar Auditoria AI Search</button>
+                </div>
+                
+                <div id="auditResultArea" class="hidden" style="margin-top: 30px;">
+                    <!-- Resultado do Audit similar ao painel overlay -->
                 </div>
             </section>
 

@@ -271,13 +271,178 @@ document.addEventListener('click', (e) => {
         }
     }
 
+    // ==========================================
+    // SEO & AI SEARCH AUDIT LOGIC
+    // ==========================================
+    window.runSeoAudit = async function(campaignData) {
+        const seoPanel = document.getElementById('seoReviewPanel');
+        if (!seoPanel) return;
+
+        // Pega o texto principal para análise
+        let mainText = "";
+        if (campaignData.facebook_ad) {
+            mainText = campaignData.facebook_ad.primary_text_a || campaignData.facebook_ad.primary_text || "";
+        } else if (campaignData.instagram_posts && campaignData.instagram_posts.length > 0) {
+            mainText = campaignData.instagram_posts[0].caption;
+        }
+
+        if (!mainText) return;
+
+        seoPanel.classList.remove('hidden');
+        document.getElementById('seoIssuesList').innerHTML = '<p class="loading-mini">Analisando visibilidade AI...</p>';
+
+        try {
+            const audit = await MKTPilot.SEO.analyze(mainText, window.currentKeywords || []);
+            renderSeoAudit(audit);
+        } catch (e) {
+            console.error("SEO Audit failed", e);
+        }
+    }
+
+    function renderSeoAudit(audit) {
+        if (!audit || audit.error) return;
+
+        // Update Scores
+        const scoreBar = document.getElementById('seoScoreBar');
+        const scoreVal = document.getElementById('seoScoreVal');
+        const aiBar = document.getElementById('aiVisibilityBar');
+        const aiVal = document.getElementById('aiVisibilityVal');
+
+        if (scoreBar) {
+            scoreBar.style.width = `${audit.score}%`;
+            scoreVal.innerText = `${audit.score}%`;
+        }
+        if (aiBar) {
+            aiBar.style.width = `${audit.ai_visibility_score}%`;
+            aiVal.innerText = `${audit.ai_visibility_score}%`;
+        }
+
+        // Update Issues
+        const issuesList = document.getElementById('seoIssuesList');
+        issuesList.innerHTML = audit.issues.map(issue => `
+            <div class="seo-issue ${issue.type}">
+                <strong>${issue.type === 'critical' ? '🔴' : '⚠️'} ${issue.message}</strong>
+                <p style="font-size: 0.75rem; margin-top: 5px; opacity: 0.8;">💡 Fix: ${issue.fix}</p>
+            </div>
+        `).join('');
+
+        window.lastAuditIssues = audit.issues;
+        window.lastAuditText = audit.copy;
+    }
+
+    window.toggleSeoPanel = function() {
+        document.getElementById('seoReviewPanel').classList.toggle('hidden');
+    }
+
+    const btnFixSeo = document.getElementById('btnFixSeo');
+    if (btnFixSeo) {
+        btnFixSeo.addEventListener('click', async () => {
+            btnFixSeo.innerText = "⏳ Otimizando Content...";
+            btnFixSeo.disabled = true;
+
+            const currentText = document.querySelector('.field-primary-text')?.value || "";
+            
+            try {
+                const data = await MKTPilot.SEO.fix(currentText, window.lastAuditIssues);
+                if (data.fixed_copy) {
+                    const textarea = document.querySelector('.field-primary-text');
+                    if (textarea) {
+                        textarea.value = data.fixed_copy;
+                        // Trigger score update
+                        updateAdScore(data.fixed_copy);
+                    }
+                    alert("✅ SEO Otimizado com Sucesso para AI Search!");
+                    toggleSeoPanel();
+                }
+            } catch (e) {
+                alert("Erro ao aplicar correções.");
+            }
+            btnFixSeo.innerText = "🚀 Corrigir tudo em 1 clique";
+            btnFixSeo.disabled = false;
+        });
+    }
+
+    // Manual SEO Audit Tab
+    const btnRunAudit = document.getElementById('btnRunAudit');
+    if (btnRunAudit) {
+        btnRunAudit.addEventListener('click', async () => {
+            const text = document.getElementById('seoAuditInput').value;
+            if (!text) return;
+
+            btnRunAudit.innerText = "⏳ Analisando...";
+            const audit = await MKTPilot.SEO.analyze(text, []);
+            // Here we could render a more detailed view for the tab
+            alert(`Audit concluído! Score: ${audit.score}%`);
+            btnRunAudit.innerText = "🚀 Iniciar Auditoria AI Search";
+        });
+    }
+
+    let maxStepReached = 1;
+    const stepGuides = {
+        1: { title: "Passo 1: Escolha a Plataforma", desc: "Selecione onde você deseja que sua campanha seja exibida para otimizarmos o formato.", icon: "📱" },
+        2: { title: "Passo 2: Tipo de Negócio", desc: "Isso ajuda a Aura IA a entender o tom de voz e o público-alvo ideal.", icon: "🏢" },
+        3: { title: "Passo 3: Detalhes do Produto", desc: "Descreva o que você vende. Você também pode colar o link de um concorrente!", icon: "🎁" },
+        4: { title: "Passo 4: Inteligência de Mercado", desc: "Analisamos tendências e palavras-chave para garantir que sua campanha seja encontrada.", icon: "📡" },
+        5: { title: "Passo 5: Objetivo Final", desc: "O que você quer alcançar? A IA vai focar toda a estratégia nesse resultado.", icon: "🎯" }
+    };
+
+    window.updateWizardProgress = function(step) {
+        if (step > maxStepReached) maxStepReached = step;
+        
+        // Update Steps
+        for (let i = 1; i <= 5; i++) {
+            const el = document.getElementById(`pstep-${i}`);
+            if (!el) continue;
+            
+            el.classList.toggle('active', i === step);
+            el.classList.toggle('completed', i < step);
+        }
+        
+        // Update Line
+        const line = document.getElementById('stepLineFill');
+        if (line) {
+            const width = (step - 1) * 25; // 0, 25, 50, 75, 100
+            line.style.width = `${width}%`;
+        }
+
+        // Update Guide Box
+        const guide = stepGuides[step];
+        if (guide) {
+            document.getElementById('guideTitle').innerText = guide.title;
+            document.getElementById('guideDesc').innerText = guide.desc;
+            document.querySelector('#stepGuide .icon').innerText = guide.icon;
+        }
+    }
+
+    window.goToStep = function(step) {
+        // Só permite ir para passos já alcançados ou o próximo imediato (se validado)
+        if (step > maxStepReached && step > maxStepReached + 1) return;
+        
+        // Esconde todos os passos
+        for (let i = 1; i <= 5; i++) {
+            document.getElementById(`wiz-step-${i}`)?.classList.add('hidden');
+        }
+        
+        // Mostra o passo alvo
+        document.getElementById(`wiz-step-${step}`)?.classList.remove('hidden');
+        
+        // Esconde loading e resultado se voltar
+        document.getElementById('loadingCopilot')?.classList.add('hidden');
+        document.getElementById('resultadoCopilot')?.classList.add('hidden');
+        
+        updateWizardProgress(step);
+    }
+
     function resetWizard() {
         currentPlatform = "Multicanal";
         currentNiche = "";
+        maxStepReached = 1;
+        
+        for (let i = 1; i <= 5; i++) {
+            document.getElementById(`wiz-step-${i}`)?.classList.add('hidden');
+        }
         document.getElementById('wiz-step-1')?.classList.remove('hidden');
-        document.getElementById('wiz-step-2')?.classList.add('hidden');
-        document.getElementById('wiz-step-3')?.classList.add('hidden');
-        document.getElementById('wiz-step-4')?.classList.add('hidden');
+        
         document.getElementById('loadingCopilot')?.classList.add('hidden');
         document.getElementById('resultadoCopilot')?.classList.add('hidden');
         const resultado = document.getElementById('resultadoCopilot');
@@ -286,10 +451,8 @@ document.addEventListener('click', (e) => {
         if (produto) produto.value = "";
         const gerarBtn = document.getElementById('btnGerarMagica');
         if (gerarBtn) gerarBtn.disabled = false;
-        // Reset progress
-        document.querySelectorAll('.progress-step').forEach((s, i) => {
-            s.classList.toggle('active', i === 0);
-        });
+        
+        updateWizardProgress(1);
     }
 
     // ==========================================
@@ -297,28 +460,69 @@ document.addEventListener('click', (e) => {
     // ==========================================
     window.selectPlatform = function(platform) {
         currentPlatform = platform;
-        document.getElementById('wiz-step-1')?.classList.add('hidden');
-        document.getElementById('wiz-step-2')?.classList.remove('hidden');
-        // Update progress
-        document.querySelectorAll('.progress-step').forEach((s, i) => s.classList.toggle('active', i <= 1));
+        goToStep(2);
     }
 
     window.selectNiche = function(niche) {
         currentNiche = niche;
-        document.getElementById('wiz-step-2')?.classList.add('hidden');
-        document.getElementById('wiz-step-3')?.classList.remove('hidden');
-        // Update progress
-        document.querySelectorAll('.progress-step').forEach((s, i) => s.classList.toggle('active', i <= 2));
+        goToStep(3);
+    }
+
+    window.generateMarketIntelligence = async function() {
+        const produto = document.getElementById('wizProduto')?.value || '';
+        const nicho = currentNiche || 'Geral';
+        
+        if (!produto) { alert('Descreva o seu produto primeiro!'); return; }
+        goToStep(4);
+
+        const marketArea = document.getElementById('marketDataArea');
+        marketArea.innerHTML = '<div class="loading-mini"><div class="spinner-small"></div> 📡 Conectando aos dados da Semrush...</div>';
+
+        try {
+            const data = await MKTPilot.SEO.marketIntelligence(nicho, produto);
+            renderMarketIntelligence(data);
+        } catch (e) {
+            marketArea.innerHTML = '<p>Erro ao obter dados de mercado. Tente novamente.</p>';
+        }
+    }
+
+    function renderMarketIntelligence(data) {
+        const marketArea = document.getElementById('marketDataArea');
+        if (!data || data.error) {
+            marketArea.innerHTML = '<p>Erro na análise de mercado.</p>';
+            return;
+        }
+
+        let html = `
+            <div class="market-card">
+                <h4>🎯 Palavras-Chave</h4>
+                <div class="keyword-tags">
+                    ${data.keywords.map(k => `<span class="keyword-tag" title="Vol: ${k.volume} | Dif: ${k.difficulty}">${k.term}</span>`).join('')}
+                </div>
+            </div>
+            <div class="market-card">
+                <h4>📡 Concorrentes</h4>
+                <ul style="font-size: 0.8rem; padding-left: 15px;">
+                    ${data.competitors.map(c => `<li>${c.name} (Força: ${c.strength})</li>`).join('')}
+                </ul>
+            </div>
+            <div class="market-card">
+                <h4>🔥 Tendências</h4>
+                <p style="font-size: 0.8rem;">${data.market_trends[0] || 'Nenhuma detectada'}</p>
+            </div>
+        `;
+        marketArea.innerHTML = html;
+
+        // Populate keywords for SEO
+        const kwArea = document.getElementById('selectedKeywords');
+        kwArea.innerHTML = data.keywords.slice(0, 5).map(k => `<span class="keyword-tag">${k.term}</span>`).join('');
+        window.currentKeywords = data.keywords.slice(0, 5).map(k => k.term);
     }
 
     window.nextWizard = function(step) {
-        if (step === 4 && !document.getElementById('wizProduto')?.value) {
-            alert('Descreva o que você vende!'); return;
+        if (step === 5) {
+            goToStep(5);
         }
-        document.getElementById('wiz-step-3')?.classList.add('hidden');
-        document.getElementById('wiz-step-4')?.classList.remove('hidden');
-        // Update progress
-        document.querySelectorAll('.progress-step').forEach((s, i) => s.classList.toggle('active', i <= 3));
     }
 
     // Botão Mágico
@@ -327,73 +531,40 @@ document.addEventListener('click', (e) => {
     const loadingCopilot = document.getElementById('loadingCopilot');
 
     if (btnGerarMagica && resultadoCopilot && loadingCopilot) {
-    btnGerarMagica.addEventListener('click', async () => {
-        const produto = document.getElementById('wizProduto')?.value || '';
-        const selectedRadio = document.querySelector('input[name="objetivo"]:checked');
-        const objetivo = selectedRadio ? selectedRadio.value : 'Aumentar seguidores e criar autoridade no nicho';
-        
-        if (!produto) { alert('Preencha o produto!'); return; }
-
-        // Ler Spy Mode e Brand Kit
-        const concorrenteUrl = document.getElementById('wizConcorrente')?.value || '';
-        const tomDeVoz = localStorage.getItem('brandkit_tom') || '';
-        const publicoAlvo = localStorage.getItem('brandkit_publico') || '';
-
-        // Esconder wizard steps e mostrar loading
-        document.getElementById('wiz-step-4')?.classList.add('hidden');
-        loadingCopilot.classList.remove('hidden');
-        resultadoCopilot.classList.add('hidden');
-        resultadoCopilot.innerHTML = '';
-        btnGerarMagica.disabled = true;
-
-        try {
-            const response = await fetch('/api/copilot/gerar', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({ 
-                    plataforma: currentPlatform, 
-                    nicho: currentNiche, 
-                    produto: produto, 
-                    objetivo: objetivo,
-                    concorrenteUrl: concorrenteUrl,
-                    tomDeVoz: tomDeVoz,
-                    publicoAlvo: publicoAlvo
-                })
-            });
-            const data = await response.json();
-            
-            loadingCopilot.classList.add('hidden');
-            resultadoCopilot.classList.remove('hidden');
-            
-            if (data.resultado) {
-                resultadoCopilot.innerHTML = renderJsonCards(data.resultado, data.id);
-                // Gatilho de Automação (Webhook/Make.com)
-                dispararAutomacao(data.resultado);
-            } else {
-                resultadoCopilot.innerText = data.erro || "Erro ao gerar.";
-            }
-        } catch (e) {
-            loadingCopilot.classList.add('hidden');
-            resultadoCopilot.classList.remove('hidden');
-            resultadoCopilot.innerText = "Erro de conexão.";
-        }
-        btnGerarMagica.disabled = false;
-    });
+        btnGerarMagica.addEventListener('click', async () => {
+            const produto = document.getElementById('wizProduto')?.value || '';
+            const selectedRadio = document.querySelector('input[name="objetivo"]:checked');
+            const objetivo = selectedRadio ? selectedRadio.value : 'Aumentar seguidores';
+            if (!produto) { alert('Preencha o produto!'); return; }
+            const keywords = window.currentKeywords || [];
+            document.getElementById('wiz-step-5')?.classList.add('hidden');
+            loadingCopilot.classList.remove('hidden');
+            resultadoCopilot.innerHTML = '';
+            btnGerarMagica.disabled = true;
+            try {
+                const res = await fetch('/api/copilot/gerar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ plataforma: currentPlatform, nicho: currentNiche, produto, objetivo, keywords })
+                });
+                const data = await res.json();
+                loadingCopilot.classList.remove('hidden');
+                resultadoCopilot.classList.remove('hidden');
+                if (data.resultado) {
+                    resultadoCopilot.innerHTML = renderJsonCards(data.resultado, data.id);
+                    dispararAutomacao(data.resultado);
+                    setTimeout(() => runSeoAudit(data.resultado), 1000);
+                }
+            } catch (e) { alert("Erro de conexão"); }
+            btnGerarMagica.disabled = false;
+        });
     }
 
-    // ==========================================
-    // HISTÓRICO (Supabase Data)
-    // ==========================================
     async function carregarHistorico() {
         const historyList = document.getElementById('historyList');
-        historyList.innerHTML = '<p>Carregando campanhas do Banco de Dados...</p>';
+        historyList.innerHTML = '<p>Carregando campanhas...</p>';
         try {
-            const res = await fetch('/api/campanhas/historico', {
-                headers: { 'Authorization': `Bearer ${authToken}` }
-            });
+            const res = await fetch('/api/campanhas/historico', { headers: { 'Authorization': `Bearer ${authToken}` } });
             const data = await res.json();
             historyList.innerHTML = '';
             if (data.campanhas && data.campanhas.length > 0) {
@@ -424,7 +595,6 @@ document.addEventListener('click', (e) => {
     }
 
     document.getElementById('btnLoadHistory')?.addEventListener('click', carregarHistorico);
-
     // ==========================================
     // EVA BRAIN (MiniMax Contexto Massivo)
     // ==========================================

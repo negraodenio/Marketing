@@ -130,5 +130,22 @@ const MKTPilot = (() => {
       post("/viral/campanha", { tendencia, produto, nicho }),
   };
 
-  return { Score, Funil, Calendario, Hooks, AB, Viral };
+  // ── 7. SEO & MARKET INTELLIGENCE ──────────────────────────────────────────
+  const SEO = {
+    BASE: "/api/seo",
+    async postSeo(path, body) {
+      const token = localStorage.getItem('sb_token');
+      const r = await fetch(SEO.BASE + path, { 
+          method: "POST", 
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, 
+          body: JSON.stringify(body) 
+      });
+      return r.json();
+    },
+    marketIntelligence: (nicho, produto) => SEO.postSeo("/market-intelligence", { nicho, produto }),
+    analyze: (copy, keywords = []) => SEO.postSeo("/analyze", { copy, keywords }),
+    fix: (copy, issues = []) => SEO.postSeo("/fix", { copy, issues }),
+  };
+
+  return { Score, Funil, Calendario, Hooks, AB, Viral, SEO };
 })();
