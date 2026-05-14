@@ -13,6 +13,8 @@ from flask import Flask, request, jsonify, render_template, redirect
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from datetime import datetime, timedelta
+import threading
+import uuid
 
 # load_dotenv removido daqui
 app = Flask(__name__)
@@ -59,6 +61,12 @@ CACHE_IMAGE_URLS = {}
 import hashlib
 import time
 import requests
+
+def sanitize_input(text):
+    """Proteção básica contra Prompt Injection e estouro de contexto"""
+    if not text: return ""
+    clean = str(text).replace("ignore all previous", "[REDACTED]").replace("system prompt", "[REDACTED]")
+    return clean[:1000]
 
 def gerar_imagem_siliconflow(prompt_texto, produto, tentativas=2):
     if not SILICONFLOW_API_KEY: return None
@@ -156,8 +164,7 @@ def gerar_audio_tts(roteiro_completo, produto):
     if not roteiro_completo: return None
     
     os.makedirs('static/audio', exist_ok=True)
-    import time
-    filename = f"audio_{produto.replace(' ', '_')[:10]}_{int(time.time())}.mp3"
+    filename = f"tts_{uuid.uuid4().hex}.mp3"
     filepath = os.path.join('static', 'audio', filename)
     
     try:
@@ -171,7 +178,7 @@ def gerar_audio_tts(roteiro_completo, produto):
 # ==========================================
 # LEAD HUNTER (Prospecção de Leads)
 # ==========================================
-def buscar_leads_locais(nicho, cidade):
+def buscar_leads_locais(nicho, cidade, db=None, user_id=None):
     """Busca leads no Google/Maps. Usa SerpApi se houver chave, senão usa Scraper Lite."""
     query = f"{nicho} em {cidade} whatsapp"
     leads = []
@@ -236,10 +243,9 @@ def buscar_leads_locais(nicho, cidade):
 
             # Persistência Elite no Supabase
             try:
-                db = supabase_admin or supabase
-                if db and user:
+                if db and user_id:
                     db.table("lead_hunter_results").insert({
-                        "user_id": user.id,
+                        "user_id": user_id,
                         "name": nome,
                         "address": "Local",
                         "phone": telefone,
@@ -378,6 +384,29 @@ supabase_admin: Client = None
 if SUPABASE_URL and SUPABASE_SERVICE_KEY:
     supabase_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+# Função para obter um cliente Supabase que respeite o RLS (identidade do usuário)
+def get_db(req=None):
+    """
+    Retorna o cliente Supabase adequado.
+    Se um request for passado, tenta usar o token do usuário (RLS).
+    Se não, ou se falhar, retorna o client anon ou admin (conforme backup).
+    """
+    if not req: 
+        return supabase_admin or supabase
+
+    auth_header = req.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            # Cria um cliente temporário para esta requisição com o token do usuário
+            user_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            user_client.postgrest.headers.update({"Authorization": f"Bearer {token}"})
+            return user_client
+        except:
+            pass
+    
+    return supabase_admin or supabase
+
 # Função para verificar o usuário logado via Token
 def get_user_from_request(req):
     if not supabase: return None
@@ -423,7 +452,7 @@ def chamar_ia(prompt, system_message="Você é um assistente de marketing especi
         ]
     }
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=45)
         response.raise_for_status()
         return response.json()['choices'][0]['message']['content']
     except Exception as e:
@@ -524,163 +553,193 @@ def login():
         return jsonify({"erro": "Credenciais inválidas"}), 401
 
 # ==========================================
+# GESTOR DE JOBS EM SEGUNDO PLANO
+# ==========================================
+def process_campaign_job(job_id, user_id, dados):
+    """Processa a geração completa da campanha em background."""
+    print(f"🚀 Iniciando Job {job_id} para usuário {user_id}", flush=True)
+    
+    # Precisamos de um client admin para atualizar o job sem depender do request original
+    db = supabase_admin
+    
+    def update_job(status=None, progress=None, step=None, result=None, error=None):
+        update_data = {}
+        if status: update_data["status"] = status
+        if progress is not None: update_data["progress"] = progress
+        if step: update_data["current_step"] = step
+        if result: update_data["result"] = result
+        if error: update_data["error"] = error
+        db.table("background_jobs").update(update_data).eq("id", job_id).execute()
+
+    try:
+        update_job(status="processing", progress=5, step="Analisando mercado e gerando copy...")
+        
+        # Sanatização de inputs
+        produto = sanitize_input(dados.get('produto', ''))
+        objetivo = sanitize_input(dados.get('objetivo', ''))
+        nicho = sanitize_input(dados.get('nicho', 'Geral'))
+        plataforma = dados.get('plataforma', 'Multicanal')
+        tom_de_voz = sanitize_input(dados.get('tomDeVoz', 'Profissional'))
+        publico_alvo = sanitize_input(dados.get('publicoAlvo', 'Geral'))
+        concorrente_url = sanitize_input(dados.get('concorrenteUrl', ''))
+        keywords = [sanitize_input(k) for k in dados.get('keywords', [])]
+
+        # 1. Scraping se necessário
+        contexto_spy = ""
+        if concorrente_url:
+            update_job(progress=10, step="Espionando concorrente...")
+            texto_concorrente = scrape_concorrente(concorrente_url)
+            if texto_concorrente:
+                contexto_spy = f"\n\nATENÇÃO (Análise de Concorrência):\nSite do concorrente: \"{texto_concorrente[:1500]}\""
+
+        # 2. Geração de Copy (IA)
+        prompt = f"""Crie uma campanha de alto impacto para "{produto}" ({nicho}) - Objetivo: {objetivo}.{contexto_spy}
+Variações: A (Ganho), B (Medo), C (Curiosidade).
+Tom: {tom_de_voz}. Público: {publico_alvo}. Plataforma: {plataforma}.
+Retorne APENAS JSON."""
+        
+        system_msg = "Você é uma API de marketing. Retorne APENAS JSON válido."
+        resposta_bruta = chamar_ia(prompt, system_message=system_msg, modelo_forcado=OPENROUTER_MODEL)
+        
+        import re, json
+        def extrair_json_do_texto(texto):
+            if not texto: return None
+            texto = re.sub(r'```json\s*', '', texto); texto = re.sub(r'```\s*', '', texto)
+            match = re.search(r'(\{.*\})', texto, re.DOTALL)
+            return json.loads(match.group(1)) if match else None
+
+        campaign_data = extrair_json_do_texto(resposta_bruta)
+        if not campaign_data:
+            raise Exception("IA falhou ao gerar JSON válido.")
+
+        update_job(progress=40, step="Polindo textos e preparando artes...")
+        campaign_data = revisar_campanha_completa(campaign_data)
+
+        # 3. Geração de Imagens
+        if "instagram_posts" in campaign_data:
+            update_job(progress=50, step="Gerando criativos visuais...")
+            for idx, post in enumerate(campaign_data["instagram_posts"]):
+                if idx >= MAX_IMAGES: break
+                post["image_url"] = gerar_imagem_com_fallback(post.get("caption", ""), produto)
+
+        # 4. Geração de Vídeo e Áudio
+        if "video_script" in campaign_data:
+            update_job(progress=70, step="Produzindo vídeo e narração IA...")
+            vs = campaign_data["video_script"]
+            roteiro = f"{vs.get('hook')}. {vs.get('body')}. {vs.get('cta')}"
+            
+            # Vídeo
+            v_url = gerar_video_com_fallback(roteiro, produto, plataforma)
+            if v_url: vs["video_url"] = v_url
+            else: vs["image_url"] = gerar_imagem_com_fallback(vs.get("hook", ""), produto)
+            
+            # Áudio
+            a_url = gerar_audio_tts(roteiro, produto)
+            if a_url: vs["audio_url"] = a_url
+
+        # 5. Persistência Final
+        update_job(progress=90, step="Finalizando e salvando...")
+        
+        insert_res = db.table("campaigns").insert({
+            "user_id": user_id,
+            "product": produto,
+            "goal": objetivo,
+            "result_text": json.dumps(campaign_data, ensure_ascii=False)
+        }).execute()
+        
+        camp_id = insert_res.data[0].get('id') if insert_res.data else None
+        
+        # Concluir Job
+        update_job(status="completed", progress=100, step="Concluído!", result={"campaign_id": camp_id, "data": campaign_data})
+        print(f"✅ Job {job_id} concluído com sucesso!", flush=True)
+
+    except Exception as e:
+        print(f"❌ Erro no Job {job_id}: {e}", flush=True)
+        update_job(status="failed", error=str(e), step="Erro no processamento")
+
+# ==========================================
 # ROTAS DO SAAS (Protegidas)
 # ==========================================
 @app.route('/api/copilot/gerar', methods=['POST'])
 def api_copilot_gerar():
     user = get_user_from_request(request)
-    if not user: return jsonify({"erro": "Não autorizado. Faça login."}), 401
+    if not user: return jsonify({"erro": "Não autorizado"}), 401
 
     dados = request.json or {}
-    produto = dados.get('produto', '')
-    objetivo = dados.get('objetivo', '')
-    nicho = dados.get('nicho', 'Geral')
-    plataforma = dados.get('plataforma', 'Multicanal')
     
-    # Brand Kit
-    tom_de_voz = dados.get('tomDeVoz', 'Profissional e Persuasivo')
-    publico_alvo = dados.get('publicoAlvo', 'Público geral interessado no nicho')
-    
-    # Spy Mode (Scraping de Concorrente)
-    concorrente_url = dados.get('concorrenteUrl', '')
-    texto_concorrente = ""
-    if concorrente_url:
-        texto_concorrente = scrape_concorrente(concorrente_url)
-
-    # Ajuste fino da linguagem baseado na plataforma
-    regras_plataforma = ""
-    if plataforma == "TikTok":
-        regras_plataforma = "- O vídeo DEVE ter estilo TikTok/UGC (User Generated Content). Use uma linguagem rápida, cortes secos, e um gancho (hook) extremamente agressivo e chamativo nos primeiros 3 segundos."
-    elif plataforma == "Meta/Instagram":
-        regras_plataforma = "- O vídeo DEVE ter estilo institucional e estético para Meta Ads. Linguagem profissional, focada em alta conversão e qualidade visual."
-    else:
-        regras_plataforma = "- O vídeo deve ser adaptável para redes sociais, mantendo um gancho forte e linguagem engajadora."
-
-    # Adiciona Brand Kit
-    regras_plataforma += f"\n- TOM DE VOZ: O tom de toda a campanha deve ser estritamente '{tom_de_voz}'."
-    regras_plataforma += f"\n- PÚBLICO-ALVO: Comunique-se diretamente com o seguinte perfil: '{publico_alvo}'."
-
-    # Adiciona Spy Mode
-    contexto_spy = ""
-    if texto_concorrente:
-        contexto_spy = f"\n\nATENÇÃO (Análise de Concorrência):\nVarremos o site do concorrente do cliente. O texto encontrado foi:\n\"...{texto_concorrente[:1500]}...\"\nCrie uma campanha SUPERIOR a esta. Identifique falhas nessa comunicação e crie ângulos que destaquem nosso produto de forma muito mais atrativa."
-
-    prompt = f"""Você é um redator de marketing de elite com 15 anos de experiência. 
-Crie uma campanha de alto impacto para o produto "{produto}" no nicho "{nicho}" com objetivo "{objetivo}".{contexto_spy}
-
-IMPORTANTE: Você deve gerar TRÊS variações estratégicas:
-- Variacao_A (Ângulo de GANHO/BENEFÍCIO)
-- Variacao_B (Ângulo de MEDO/ESCASSEZ)
-- Variacao_C (Ângulo de CURIOSIDADE)
-
-Regras Inegociáveis:
-- Use português impecável.
-- Call to Action (CTA) deve ser específico e gerar urgência.
-{regras_plataforma}
-
-Responda EXATAMENTE neste formato JSON:
-{{
-  "instagram_posts": [
-    {{"caption": "Variação A (Ganho): ...", "hashtags": "..."}},
-    {{"caption": "Variação B (Medo): ...", "hashtags": "..."}},
-    {{"caption": "Variação C (Curiosidade): ...", "hashtags": "..."}}
-  ],
-  "facebook_ad": {{
-    "headline_a": "...", "headline_b": "...", "headline_c": "...",
-    "primary_text_a": "...", "primary_text_b": "...", "primary_text_c": "...",
-    "cta": "Saiba Mais"
-  }},
-  "email": {{
-    "subject_a": "...", "subject_b": "...",
-    "body_a": "...", "body_b": "..."
-  }},
-  "video_script": {{"hook": "...", "body": "...", "cta": "..."}}
-}}"""
-
-    system_msg = "Você é uma API de geração de campanhas. Você retorna APENAS JSON válido. NUNCA adicione texto explicativo."
-    
-    resposta_bruta = chamar_ia(prompt, system_message=system_msg, modelo_forcado=OPENROUTER_MODEL)
-
-    import re, json
-    def extrair_json_do_texto(texto):
-        if not texto: return None
-        texto = re.sub(r'```json\s*', '', texto)
-        texto = re.sub(r'```\s*', '', texto)
-        match = re.search(r'(\{.*\})', texto, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(1))
-            except json.JSONDecodeError:
-                pass
-        return None
-
-    if resposta_bruta:
-        print(f"DEBUG: Resposta Bruta da IA: {resposta_bruta[:500]}...", flush=True)
-    campaign_data = extrair_json_do_texto(resposta_bruta)
-
-    if not campaign_data:
-        print("⚠️ AVISO: IA falhou no JSON ou recusou. Usando Fallback Seguro.", flush=True)
-        campaign_data = {
-            "instagram_posts": [
-                {"caption": f"Descubra como {produto} resolve os problemas do mercado de {nicho}.", "hashtags": f"#{nicho.replace(' ', '')} #dicas"},
-                {"caption": f"Com {produto}, você alcança {objetivo} rapidamente.", "hashtags": "#sucesso #vendas"},
-                {"caption": "Oferta especial! Clique no link e garanta seu acesso.", "hashtags": "#oportunidade #agora"}
-            ],
-            "facebook_ad": {"headline": f"A revolução do {nicho}", "primary_text": f"Quer {objetivo}? Conheça {produto}.", "cta": "Saiba Mais"},
-            "email": {"subject": f"Transforme seu {nicho}", "body": f"Olá,<br><br>Conheça {produto}, ideal para quem busca {objetivo}.<br><br>Clique aqui e comece!"},
-            "video_script": {"hook": f"Cansado de resultados fracos em {nicho}?", "body": f"Com {produto}, você atinge {objetivo} mais rápido.", "cta": "Acesse o link na descrição!"}
-        }
-    else:
-        # Aplicar revisão automática de polimento
-        print("✨ Aplicando revisão de qualidade IA...", flush=True)
-        campaign_data = revisar_campanha_completa(campaign_data)
-
-    # Gera imagens via SiliconFlow para os posts (Fica limitado a MAX_IMAGES)
-    if "instagram_posts" in campaign_data:
-        for idx, post in enumerate(campaign_data["instagram_posts"]):
-            if idx >= MAX_IMAGES: break
-            legenda = post.get("caption", "")
-            img_url = gerar_imagem_com_fallback(legenda, produto)
-            post["image_url"] = img_url
-
-    # Gera VÍDEO REAL a partir do roteiro
-    if "video_script" in campaign_data:
-        hook = campaign_data["video_script"].get("hook", "")
-        body = campaign_data["video_script"].get("body", "")
-        cta = campaign_data["video_script"].get("cta", "")
-        roteiro_completo = f"Opening hook: {hook}. Main content: {body}. Call to action: {cta}"
-        
-        video_url = gerar_video_com_fallback(roteiro_completo, produto, plataforma)
-        if video_url:
-            campaign_data["video_script"]["video_url"] = video_url
-        else:
-            # Fallback: gera ao menos uma thumbnail estática
-            video_img = gerar_imagem_com_fallback(f"Cena de vídeo: {hook}", produto)
-            campaign_data["video_script"]["image_url"] = video_img
-            
-        # Áudio TTS (Sempre tenta gerar o áudio do roteiro)
-        roteiro_falado = f"{hook}. {body}. {cta}"
-        audio_url = gerar_audio_tts(roteiro_falado, produto)
-        if audio_url:
-            campaign_data["video_script"]["audio_url"] = audio_url
-
-    camp_id = None
+    # 0. Rate Limit Check (1 geração por minuto)
     try:
-        db = supabase_admin or supabase
-        if db:
-            insert_res = db.table("campaigns").insert({
-                "user_id": user.id,
-                "product": produto,
-                "goal": objetivo,
-                "result_text": json.dumps(campaign_data, ensure_ascii=False)
-            }).execute()
-            if insert_res.data:
-                camp_id = insert_res.data[0].get('id')
-                print("Campanha salva no banco com sucesso!", flush=True)
+        db = get_db(request)
+        last_job = db.table("background_jobs").select("created_at").eq("user_id", user.id).order("created_at", desc=True).limit(1).execute()
+        if last_job.data:
+            from datetime import datetime, timezone
+            last_time = datetime.fromisoformat(last_job.data[0]['created_at'].replace('Z', '+00:00'))
+            if datetime.now(timezone.utc) - last_time < timedelta(minutes=1):
+                return jsonify({"erro": "Aura IA precisa descansar. Aguarde 1 minuto entre gerações."}), 429
     except Exception as e:
-        print(f"Aviso: Falha ao salvar campanha: {e}", flush=True)
+        print(f"Erro no Rate Limit: {e}")
 
-    return jsonify({"resultado": campaign_data, "id": camp_id}), 200
+    # 1. Cria o registro do Job no banco
+    try:
+        db = get_db(request)
+        job_res = db.table("background_jobs").insert({
+            "user_id": user.id,
+            "status": "pending",
+            "payload": dados,
+            "current_step": "Aguardando fila..."
+        }).execute()
+        
+        if not job_res.data:
+            return jsonify({"erro": "Falha ao criar tarefa no servidor"}), 500
+            
+        job_id = job_res.data[0]['id']
+        
+        # 2. Dispara a thread em background
+        thread = threading.Thread(target=process_campaign_job, args=(job_id, user.id, dados))
+        thread.start()
+        
+        return jsonify({"job_id": job_id, "mensagem": "Tarefa iniciada em background"}), 202
+        
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao iniciar processamento: {str(e)}"}), 500
+
+@app.route('/api/copilot/status/<job_id>', methods=['GET'])
+def api_copilot_status(job_id):
+    user = get_user_from_request(request)
+    if not user: return jsonify({"erro": "Não autorizado"}), 401
+    
+    try:
+        db = get_db(request)
+        res = db.table("background_jobs").select("*").eq("id", job_id).eq("user_id", user.id).single().execute()
+        
+        if not res.data:
+            return jsonify({"erro": "Tarefa não encontrada"}), 404
+            
+        return jsonify(res.data), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/copilot/jobs/active', methods=['GET'])
+def api_copilot_jobs_active():
+    user = get_user_from_request(request)
+    if not user: return jsonify({"erro": "Não autorizado"}), 401
+    try:
+        db = get_db(request)
+        res = db.table("background_jobs").select("id, status, progress, current_step, created_at").eq("user_id", user.id).in_("status", ["pending", "processing"]).order("created_at", desc=True).execute()
+        return jsonify({"jobs": res.data}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/api/copilot/jobs/list', methods=['GET'])
+def api_copilot_jobs_list():
+    user = get_user_from_request(request)
+    if not user: return jsonify({"erro": "Não autorizado"}), 401
+    try:
+        db = get_db(request)
+        res = db.table("background_jobs").select("id, status, progress, current_step, created_at, error").eq("user_id", user.id).order("created_at", desc=True).limit(5).execute()
+        return jsonify({"jobs": res.data}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/campaigns/update', methods=['POST'])
 def api_campaigns_update():
@@ -695,7 +754,7 @@ def api_campaigns_update():
         return jsonify({"erro": "Dados incompletos"}), 400
         
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         db.table("campaigns").update({
             "result_text": json.dumps(novos_dados, ensure_ascii=False)
         }).eq("id", campanha_id).eq("user_id", user.id).execute()
@@ -709,7 +768,7 @@ def api_campanhas_historico():
     if not user: return jsonify({"erro": "Não autorizado"}), 401
     
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("campaigns").select("*").eq("user_id", user.id).order("created_at", desc=True).execute()
         return jsonify({"campanhas": res.data}), 200
     except Exception as e:
@@ -728,7 +787,7 @@ def api_campanhas_otimizar():
     historico_texto = ""
     if auto_mode:
         try:
-            db = supabase_admin or supabase
+            db = get_db(request)
             res = db.table("campaigns").select("product, goal, result_text, created_at").eq("user_id", user.id).order("created_at", desc=True).limit(10).execute()
             if res.data:
                 for i, camp in enumerate(res.data):
@@ -746,7 +805,7 @@ def api_campanhas_otimizar():
             print(f"Erro ao buscar histórico: {e}", flush=True)
             return jsonify({"erro": "Falha ao buscar campanhas do banco."}), 500
     
-    conteudo = relatorio_manual or historico_texto
+    conteudo = sanitize_input(relatorio_manual) or historico_texto
     if not conteudo.strip():
         return jsonify({"erro": "Cole dados de campanha ou clique em 'Análise Automática' para usar o histórico do banco."}), 400
     
@@ -819,7 +878,7 @@ def meta_callback():
     
     # Salvar token no banco (por usuário)
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         if db and ad_account_id and user_id:
             db.table("user_meta_tokens").upsert({
                 "user_id": str(user_id),
@@ -846,7 +905,7 @@ def api_publish_to_meta():
     
     # Buscar token do usuário no banco
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("user_meta_tokens").select("*").eq("user_id", user.id).single().execute()
         if not res.data:
             return jsonify({"erro": "Conecte sua conta Meta primeiro! Clique em 'Conectar Meta Ads' no menu."}), 400
@@ -912,7 +971,6 @@ def tiktok_callback():
         }
     )
     token_data = resp.json()
-    print(f"DEBUG TikTok OAuth response: {token_data}", flush=True)
     
     if token_data.get('code') != 0:
         return f"Erro TikTok: {token_data.get('message', 'Desconhecido')}", 400
@@ -931,7 +989,7 @@ def tiktok_callback():
     
     # Salvar token no banco
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         if db and user_id:
             db.table("user_tiktok_tokens").upsert({
                 "user_id": str(user_id),
@@ -957,7 +1015,7 @@ def api_tiktok_status():
     user = get_user_from_request(request)
     if not user: return jsonify({"connected": False}), 200
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("user_tiktok_tokens").select("advertiser_id").eq("user_id", user.id).single().execute()
         if res.data:
             return jsonify({"connected": True, "advertiser_id": res.data['advertiser_id']}), 200
@@ -969,7 +1027,7 @@ def api_meta_status():
     user = get_user_from_request(request)
     if not user: return jsonify({"connected": False}), 200
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("user_meta_tokens").select("ad_account_id").eq("user_id", user.id).single().execute()
         if res.data:
             return jsonify({"connected": True, "ad_account_id": res.data['ad_account_id']}), 200
@@ -983,7 +1041,7 @@ def api_publish_to_tiktok():
     
     # Buscar token do usuário
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("user_tiktok_tokens").select("*").eq("user_id", user.id).single().execute()
         if not res.data:
             return jsonify({"erro": "Conecte sua conta TikTok primeiro! Clique em 'Conectar TikTok' no menu."}), 400
@@ -1042,13 +1100,14 @@ def api_leads_buscar():
     if not user: return jsonify({"erro": "Não autorizado"}), 401
     
     dados = request.json or {}
-    nicho = dados.get('nicho')
-    cidade = dados.get('cidade')
+    nicho = sanitize_input(dados.get('nicho'))
+    cidade = sanitize_input(dados.get('cidade'))
     
     if not nicho or not cidade:
         return jsonify({"erro": "Nicho e Cidade são obrigatórios"}), 400
         
-    leads = buscar_leads_locais(nicho, cidade)
+    db = get_db(request)
+    leads = buscar_leads_locais(nicho, cidade, db=db, user_id=user.id)
     return jsonify({"leads": leads}), 200
 
 @app.route('/api/leads/pitch', methods=['POST'])
@@ -1116,17 +1175,18 @@ Responda ESTRITAMENTE em JSON:
         data = pyjson.loads(resultado[resultado.find('{'):resultado.rfind('}')+1])
         
         # Persistência Elite
-        try:
-            db = supabase_admin or supabase
-            db.table("ad_predictions").insert({
-                "user_id": user.id,
-                "creative_url": image_url,
-                "copy_text": texto,
-                "viral_score": data.get("score"),
-                "metrics": data.get("metrics"),
-                "suggestions": [data.get("dica")]
-            }).execute()
-        except: pass
+        if data.get('score'):
+            try:
+                db = get_db(request)
+                db.table("ad_predictions").insert({
+                    "user_id": user.id,
+                    "creative_url": image_url,
+                    "copy_text": texto,
+                    "viral_score": data.get("score"),
+                    "metrics": data.get("metrics"),
+                    "suggestions": [data.get("dica")]
+                }).execute()
+            except: pass
 
         return jsonify(data), 200
     except:
@@ -1138,7 +1198,7 @@ def api_campaign_proposal(id):
     if not user: return jsonify({"erro": "Não autorizado"}), 401
     
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("campaigns").select("*").eq("id", id).single().execute()
         if not res.data: return jsonify({"erro": "Campanha não encontrada"}), 404
         
@@ -1205,7 +1265,7 @@ def api_campaign_proposal(id):
         """
         # Persistência Elite
         try:
-            db = supabase_admin or supabase
+            db = get_db(request)
             db.table("proposals").insert({
                 "user_id": user.id,
                 "campaign_id": camp.get('id'),
@@ -1226,7 +1286,7 @@ def api_calendar_generate():
     
     # Busca Brand Kit para contexto
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("user_configs").select("*").eq("user_id", user.id).single().execute()
         brand_data = res.data or {}
     except: brand_data = {}
@@ -1309,7 +1369,7 @@ def api_viral_trends():
 @app.route('/api/marketplace/list', methods=['GET'])
 def api_marketplace_list():
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("marketplace_templates").select("*").eq("status", "approved").execute()
         return jsonify({"templates": res.data or []}), 200
     except:
@@ -1327,7 +1387,7 @@ def api_marketplace_publish():
     
     dados = request.json or {}
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("marketplace_templates").insert({
             "author_id": user.id,
             "title": dados.get("title"),
@@ -1348,7 +1408,7 @@ def api_competitors_watch():
     url = dados.get('url')
     
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         # Salva o monitor
         db.table("competitor_monitors").insert({
             "user_id": user.id,
@@ -1362,7 +1422,7 @@ def api_competitors_watch():
 @app.route('/api/challenges/current', methods=['GET'])
 def api_challenges_current():
     try:
-        db = supabase_admin or supabase
+        db = get_db(request)
         res = db.table("weekly_challenges").select("*").eq("status", "active").order("created_at", desc=True).limit(1).execute()
         if res.data:
             return jsonify({"challenge": res.data[0]}), 200

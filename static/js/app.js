@@ -20,6 +20,7 @@ function initApp() {
             const userDisp = document.getElementById('userEmailDisplay');
             if (userDisp) userDisp.innerText = userEmail;
             console.log("DEBUG: Dashboard exibido.");
+            checkExistingJobs(); // Recupera tarefas em background
         } else {
             authScreen.classList.remove('hidden');
             appScreen.classList.add('hidden');
@@ -70,8 +71,6 @@ function initApp() {
         statusDiv.innerHTML = statusText;
     }
     if (authToken) checkConnections();
-
-    // Os listeners de clique serão registrados abaixo, após a definição global
 
 
 // ==========================================
@@ -146,45 +145,26 @@ document.addEventListener('click', (e) => {
     }
 
     // ==========================================
-    // SISTEMA DE ABAS DO SAAS
+    // SISTEMA DE ABAS CONSOLIDADO
     // ==========================================
-    const navLinks = document.querySelectorAll('.nav-links li');
-    const tabPanes = document.querySelectorAll('.tab-pane');
-
-    navLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            navLinks.forEach(l => l.classList.remove('active'));
-            tabPanes.forEach(t => t.classList.add('hidden'));
-            
-            link.classList.add('active');
-            const targetTab = link.dataset.tab;
-            document.getElementById(`tab-${targetTab}`)?.classList.remove('hidden');
-            
-            // Resetar wizard ao clicar em "Nova Campanha"
-            if (targetTab === 'wizard') {
-                resetWizard();
-            }
-            // Carregar histórico automaticamente ao clicar na aba
-            if (targetTab === 'history') {
-                carregarHistorico();
-            }
-            // Carregar Brand Kit ao clicar na aba
-            if (targetTab === 'config') {
-                carregarBrandKit();
-            }
-            if (targetTab === 'automations') {
-                carregarAutomacoes();
-            }
-            if (targetTab === 'calendar') {
-                // Opcional: carregar automático ou esperar clique no botão
-            }
-            if (targetTab === 'hooks') {
-                carregarHooksIniciais();
-            }
-            if (targetTab === 'viral') {
-                carregarTendenciasIniciais();
-            }
-        });
+    window.switchTab = function(tabId) {
+        console.log("DEBUG: Alternando para aba", tabId);
+        document.querySelectorAll('.nav-links li, .nav-item').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+        const baseId = tabId.replace('tab-', '');
+        document.querySelectorAll(`[data-tab="${baseId}"], .nav-item[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
+        const target = document.getElementById(tabId.startsWith('tab-') ? tabId : `tab-${tabId}`);
+        if (target) { target.classList.remove('hidden'); target.classList.add('fade-in'); }
+        if (baseId === 'wizard') resetWizard();
+        if (baseId === 'history') carregarHistorico();
+        if (baseId === 'config') carregarBrandKit();
+        if (baseId === 'automations') carregarAutomacoes();
+        if (baseId === 'hooks') carregarHooksIniciais();
+        if (baseId === 'viral') carregarTendenciasIniciais();
+        if (baseId === 'marketplace') loadMarketplace();
+    };
+    document.querySelectorAll('.nav-links li').forEach(link => {
+        link.addEventListener('click', () => { const tab = link.dataset.tab; if (tab) switchTab(`tab-${tab}`); });
     });
 
 
@@ -253,7 +233,6 @@ document.addEventListener('click', (e) => {
         if (webhookEnabled && webhookUrl) {
             console.log("🚀 Disparando Webhook de Automação...");
             try {
-                // Envio em segundo plano (não trava o UI)
                 fetch(webhookUrl, {
                     method: 'POST',
                     mode: 'no-cors',
@@ -278,7 +257,6 @@ document.addEventListener('click', (e) => {
         const seoPanel = document.getElementById('seoReviewPanel');
         if (!seoPanel) return;
 
-        // Pega o texto principal para análise
         let mainText = "";
         if (campaignData.facebook_ad) {
             mainText = campaignData.facebook_ad.primary_text_a || campaignData.facebook_ad.primary_text || "";
@@ -302,7 +280,6 @@ document.addEventListener('click', (e) => {
     function renderSeoAudit(audit) {
         if (!audit || audit.error) return;
 
-        // Update Scores
         const scoreBar = document.getElementById('seoScoreBar');
         const scoreVal = document.getElementById('seoScoreVal');
         const aiBar = document.getElementById('aiVisibilityBar');
@@ -317,7 +294,6 @@ document.addEventListener('click', (e) => {
             aiVal.innerText = `${audit.ai_visibility_score}%`;
         }
 
-        // Update Issues
         const issuesList = document.getElementById('seoIssuesList');
         issuesList.innerHTML = audit.issues.map(issue => `
             <div class="seo-issue ${issue.type}">
@@ -348,7 +324,6 @@ document.addEventListener('click', (e) => {
                     const textarea = document.querySelector('.field-primary-text');
                     if (textarea) {
                         textarea.value = data.fixed_copy;
-                        // Trigger score update
                         updateAdScore(data.fixed_copy);
                     }
                     alert("✅ SEO Otimizado com Sucesso para AI Search!");
@@ -371,7 +346,6 @@ document.addEventListener('click', (e) => {
 
             btnRunAudit.innerText = "⏳ Analisando...";
             const audit = await MKTPilot.SEO.analyze(text, []);
-            // Here we could render a more detailed view for the tab
             alert(`Audit concluído! Score: ${audit.score}%`);
             btnRunAudit.innerText = "🚀 Iniciar Auditoria AI Search";
         });
@@ -388,24 +362,17 @@ document.addEventListener('click', (e) => {
 
     window.updateWizardProgress = function(step) {
         if (step > maxStepReached) maxStepReached = step;
-        
-        // Update Steps
         for (let i = 1; i <= 5; i++) {
             const el = document.getElementById(`pstep-${i}`);
             if (!el) continue;
-            
             el.classList.toggle('active', i === step);
             el.classList.toggle('completed', i < step);
         }
-        
-        // Update Line
         const line = document.getElementById('stepLineFill');
         if (line) {
-            const width = (step - 1) * 25; // 0, 25, 50, 75, 100
+            const width = (step - 1) * 25;
             line.style.width = `${width}%`;
         }
-
-        // Update Guide Box
         const guide = stepGuides[step];
         if (guide) {
             document.getElementById('guideTitle').innerText = guide.title;
@@ -415,21 +382,13 @@ document.addEventListener('click', (e) => {
     }
 
     window.goToStep = function(step) {
-        // Só permite ir para passos já alcançados ou o próximo imediato (se validado)
         if (step > maxStepReached && step > maxStepReached + 1) return;
-        
-        // Esconde todos os passos
         for (let i = 1; i <= 5; i++) {
             document.getElementById(`wiz-step-${i}`)?.classList.add('hidden');
         }
-        
-        // Mostra o passo alvo
         document.getElementById(`wiz-step-${step}`)?.classList.remove('hidden');
-        
-        // Esconde loading e resultado se voltar
         document.getElementById('loadingCopilot')?.classList.add('hidden');
         document.getElementById('resultadoCopilot')?.classList.add('hidden');
-        
         updateWizardProgress(step);
     }
 
@@ -437,12 +396,10 @@ document.addEventListener('click', (e) => {
         currentPlatform = "Multicanal";
         currentNiche = "";
         maxStepReached = 1;
-        
         for (let i = 1; i <= 5; i++) {
             document.getElementById(`wiz-step-${i}`)?.classList.add('hidden');
         }
         document.getElementById('wiz-step-1')?.classList.remove('hidden');
-        
         document.getElementById('loadingCopilot')?.classList.add('hidden');
         document.getElementById('resultadoCopilot')?.classList.add('hidden');
         const resultado = document.getElementById('resultadoCopilot');
@@ -451,13 +408,9 @@ document.addEventListener('click', (e) => {
         if (produto) produto.value = "";
         const gerarBtn = document.getElementById('btnGerarMagica');
         if (gerarBtn) gerarBtn.disabled = false;
-        
         updateWizardProgress(1);
     }
 
-    // ==========================================
-    // WIZARD ONBOARDING (COPILOTO IDIOT-PROOF)
-    // ==========================================
     window.selectPlatform = function(platform) {
         currentPlatform = platform;
         goToStep(2);
@@ -471,13 +424,10 @@ document.addEventListener('click', (e) => {
     window.generateMarketIntelligence = async function() {
         const produto = document.getElementById('wizProduto')?.value || '';
         const nicho = currentNiche || 'Geral';
-        
         if (!produto) { alert('Descreva o seu produto primeiro!'); return; }
         goToStep(4);
-
         const marketArea = document.getElementById('marketDataArea');
         marketArea.innerHTML = '<div class="loading-mini"><div class="spinner-small"></div> 📡 Conectando aos dados da Semrush...</div>';
-
         try {
             const data = await MKTPilot.SEO.marketIntelligence(nicho, produto);
             renderMarketIntelligence(data);
@@ -492,40 +442,162 @@ document.addEventListener('click', (e) => {
             marketArea.innerHTML = '<p>Erro na análise de mercado.</p>';
             return;
         }
-
         let html = `
             <div class="market-card">
                 <h4>🎯 Palavras-Chave</h4>
                 <div class="keyword-tags">
-                    ${data.keywords.map(k => `<span class="keyword-tag" title="Vol: ${k.volume} | Dif: ${k.difficulty}">${k.term}</span>`).join('')}
+                    ${data.keywords.map(k => `<span class="keyword-tag" title="Vol: ${k.volume} | Dif: ${k.difficulty}">${escapeHTML(k.term)}</span>`).join('')}
                 </div>
             </div>
             <div class="market-card">
                 <h4>📡 Concorrentes</h4>
                 <ul style="font-size: 0.8rem; padding-left: 15px;">
-                    ${data.competitors.map(c => `<li>${c.name} (Força: ${c.strength})</li>`).join('')}
+                    ${data.competitors.map(c => `<li>${escapeHTML(c.name)} (Força: ${c.strength})</li>`).join('')}
                 </ul>
             </div>
             <div class="market-card">
                 <h4>🔥 Tendências</h4>
-                <p style="font-size: 0.8rem;">${data.market_trends[0] || 'Nenhuma detectada'}</p>
+                <p style="font-size: 0.8rem;">${escapeHTML(data.market_trends[0] || 'Nenhuma detectada')}</p>
             </div>
         `;
         marketArea.innerHTML = html;
-
-        // Populate keywords for SEO
         const kwArea = document.getElementById('selectedKeywords');
-        kwArea.innerHTML = data.keywords.slice(0, 5).map(k => `<span class="keyword-tag">${k.term}</span>`).join('');
+        kwArea.innerHTML = data.keywords.slice(0, 5).map(k => `<span class="keyword-tag">${escapeHTML(k.term)}</span>`).join('');
         window.currentKeywords = data.keywords.slice(0, 5).map(k => k.term);
     }
 
-    window.nextWizard = function(step) {
-        if (step === 5) {
-            goToStep(5);
+    let activeJobs = {};
+
+    function updateJobsUI() {
+        const activeArea = document.getElementById('activeJobsArea');
+        const activeList = document.getElementById('activeJobsList');
+        const badge = document.getElementById('jobBadge');
+        const badgeText = document.getElementById('jobBadgeText');
+        
+        if (!activeArea || !activeList || !badge) return;
+
+        const runningJobs = Object.values(activeJobs).filter(j => j.status === 'processing' || j.status === 'pending');
+        
+        if (runningJobs.length > 0) {
+            activeArea.classList.remove('hidden');
+            badge.classList.remove('hidden');
+            badgeText.innerText = `${runningJobs.length} tarefa${runningJobs.length > 1 ? 's' : ''} ativa${runningJobs.length > 1 ? 's' : ''}`;
+            
+            activeList.innerHTML = runningJobs.map(job => `
+                <div class="active-job-card fade-in">
+                    <div class="job-info">
+                        <div style="font-size: 0.85rem; font-weight: 600;">${escapeHTML(job.current_step || 'Processando...')}</div>
+                        <div class="job-progress-mini">
+                            <div class="job-progress-fill-mini" style="width: ${job.progress || 0}%"></div>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; opacity: 0.6; margin-left: 15px;">${job.progress || 0}%</div>
+                </div>
+            `).join('');
+        } else {
+            activeArea.classList.add('hidden');
+            badge.classList.add('hidden');
         }
     }
 
-    // Botão Mágico
+    async function checkExistingJobs() {
+        if (!authToken) return;
+        try {
+            const res = await fetch('/api/copilot/jobs/active', {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const data = await res.json();
+            if (data.jobs && data.jobs.length > 0) {
+                data.jobs.forEach(job => {
+                    if (!activeJobs[job.id]) {
+                        pollJobStatus(job.id, true); 
+                    }
+                });
+            }
+        } catch (e) { console.error("Erro ao checar jobs ativos:", e); }
+    }
+
+    async function pollJobStatus(jobId, silent = false) {
+        const loadingCopilot = document.getElementById('loadingCopilot');
+        const resultadoCopilot = document.getElementById('resultadoCopilot');
+        const btnGerarMagica = document.getElementById('btnGerarMagica');
+        let failCount = 0;
+        
+        const pollInterval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/copilot/status/${jobId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (!res.ok) throw new Error("Servidor indisponível");
+                
+                const job = await res.json();
+                failCount = 0; 
+
+                // Atualiza estado global
+                activeJobs[jobId] = job;
+                updateJobsUI();
+                
+                if (job.status === 'processing' || job.status === 'pending') {
+                    if (!silent && loadingCopilot && !loadingCopilot.classList.contains('hidden')) {
+                        loadingCopilot.innerHTML = `
+                            <div class="glass-panel fade-in" style="padding:40px; text-align:center; max-width:500px; margin:0 auto;">
+                                <div class="spinner" style="width:50px; height:50px; margin-bottom:20px;"></div>
+                                <h3 style="color:var(--accent); margin-bottom:10px;">${escapeHTML(job.current_step || 'Processando...')}</h3>
+                                <div style="width:100%; background:rgba(255,255,255,0.1); height:6px; border-radius:10px; overflow:hidden; margin:15px 0;">
+                                    <div style="width:${job.progress}%; height:100%; background:var(--accent); transition: width 0.5s ease;"></div>
+                                </div>
+                                <p style="font-size:0.85rem; opacity:0.7;">Isso pode levar até 2 minutos devido à alta qualidade da IA.</p>
+                            </div>
+                        `;
+                    }
+                } else if (job.status === 'completed') {
+                    clearInterval(pollInterval);
+                    delete activeJobs[jobId];
+                    updateJobsUI();
+
+                    if (!silent) {
+                        loadingCopilot.classList.add('hidden');
+                        resultadoCopilot.classList.remove('hidden');
+                        const result = job.result;
+                        if (result && result.data) {
+                            resultadoCopilot.innerHTML = renderJsonCards(result.data, result.campaign_id);
+                            if (typeof dispararAutomacao === 'function') dispararAutomacao(result.data);
+                            setTimeout(() => { if (typeof runSeoAudit === 'function') runSeoAudit(result.data); }, 1000);
+                        }
+                        if (btnGerarMagica) btnGerarMagica.disabled = false;
+                    } else {
+                        // Se era silent (resume), notifica o usuário discretamente ou atualiza o histórico se estiver aberto
+                        console.log(`✅ Job ${jobId} finalizado em background.`);
+                        if (document.getElementById('tab-history').classList.contains('active')) carregarHistorico();
+                    }
+                } else if (job.status === 'failed') {
+                    clearInterval(pollInterval);
+                    delete activeJobs[jobId];
+                    updateJobsUI();
+                    if (!silent) {
+                        alert("⚠️ Falha na Geração: " + (job.error || "Erro desconhecido."));
+                        loadingCopilot.classList.add('hidden');
+                        document.getElementById('wiz-step-5')?.classList.remove('hidden');
+                        if (btnGerarMagica) btnGerarMagica.disabled = false;
+                    }
+                }
+            } catch (e) {
+                failCount++;
+                if (failCount > 5) {
+                    clearInterval(pollInterval);
+                    delete activeJobs[jobId];
+                    updateJobsUI();
+                    if (!silent) {
+                        alert("⚠️ Conexão perdida com o servidor.");
+                        loadingCopilot.classList.add('hidden');
+                        if (btnGerarMagica) btnGerarMagica.disabled = false;
+                    }
+                }
+            }
+        }, 2500);
+    }
+
     const btnGerarMagica = document.getElementById('btnGerarMagica');
     const resultadoCopilot = document.getElementById('resultadoCopilot');
     const loadingCopilot = document.getElementById('loadingCopilot');
@@ -536,27 +608,42 @@ document.addEventListener('click', (e) => {
             const selectedRadio = document.querySelector('input[name="objetivo"]:checked');
             const objetivo = selectedRadio ? selectedRadio.value : 'Aumentar seguidores';
             if (!produto) { alert('Preencha o produto!'); return; }
+            const concorrenteUrl = document.getElementById('wizConcorrente')?.value || '';
+            const tomDeVoz = localStorage.getItem('brandkit_tom') || 'Profissional';
+            const publicoAlvo = localStorage.getItem('brandkit_publico') || 'Geral';
             const keywords = window.currentKeywords || [];
+
             document.getElementById('wiz-step-5')?.classList.add('hidden');
             loadingCopilot.classList.remove('hidden');
+            loadingCopilot.innerHTML = `
+                <div class="glass-panel fade-in" style="padding:40px; text-align:center; max-width:500px; margin:0 auto;">
+                    <div class="spinner" style="width:50px; height:50px; margin-bottom:20px;"></div>
+                    <h3 style="color:var(--accent);">Iniciando Aura IA...</h3>
+                    <p style="font-size:0.85rem; opacity:0.7;">Preparando ambiente de processamento...</p>
+                </div>
+            `;
             resultadoCopilot.innerHTML = '';
             btnGerarMagica.disabled = true;
             try {
                 const res = await fetch('/api/copilot/gerar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                    body: JSON.stringify({ plataforma: currentPlatform, nicho: currentNiche, produto, objetivo, keywords })
+                    body: JSON.stringify({ 
+                        plataforma: currentPlatform, nicho: currentNiche, produto, objetivo, keywords, concorrenteUrl, tomDeVoz, publicoAlvo
+                    })
                 });
                 const data = await res.json();
-                loadingCopilot.classList.remove('hidden');
-                resultadoCopilot.classList.remove('hidden');
-                if (data.resultado) {
-                    resultadoCopilot.innerHTML = renderJsonCards(data.resultado, data.id);
-                    dispararAutomacao(data.resultado);
-                    setTimeout(() => runSeoAudit(data.resultado), 1000);
+                if (data.job_id) {
+                    pollJobStatus(data.job_id);
+                } else {
+                    throw new Error(data.erro || "Falha ao iniciar tarefa.");
                 }
-            } catch (e) { alert("Erro de conexão"); }
-            btnGerarMagica.disabled = false;
+            } catch (e) { 
+                alert("Erro: " + e.message);
+                loadingCopilot.classList.add('hidden');
+                document.getElementById('wiz-step-5')?.classList.remove('hidden');
+                btnGerarMagica.disabled = false;
+            }
         });
     }
 
@@ -570,13 +657,15 @@ document.addEventListener('click', (e) => {
             if (data.campanhas && data.campanhas.length > 0) {
                 data.campanhas.forEach(c => {
                     const dataHora = c.created_at ? new Date(c.created_at).toLocaleString('pt-BR') : '';
+                    const safeProduct = escapeHTML(c.product);
+                    const safeGoal = escapeHTML(c.goal);
                     historyList.innerHTML += `
                         <div class="campaign-card">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <p><strong>📦 ${c.product}</strong></p>
+                                <p><strong>📦 ${safeProduct}</strong></p>
                                 <small style="opacity:0.6;">${dataHora}</small>
                             </div>
-                            <p style="opacity:0.8; font-size:0.85rem;">🎯 ${c.goal}</p>
+                            <p style="opacity:0.8; font-size:0.85rem;">🎯 ${safeGoal}</p>
                             <details style="margin-top:10px; cursor:pointer;">
                                 <summary>Ver Campanha Completa</summary>
                                 <div style="margin-top:10px; font-size:0.9em; opacity:0.85;">
@@ -595,6 +684,7 @@ document.addEventListener('click', (e) => {
     }
 
     document.getElementById('btnLoadHistory')?.addEventListener('click', carregarHistorico);
+
     // ==========================================
     // EVA BRAIN (MiniMax Contexto Massivo)
     // ==========================================
@@ -604,9 +694,8 @@ document.addEventListener('click', (e) => {
     const btnAnaliseAuto = document.getElementById('btnAnaliseAuto');
     const btnAnaliseManual = document.getElementById('btnAnaliseManual');
     const manualInputArea = document.getElementById('manualInputArea');
-    let evaMode = 'manual'; // 'auto' ou 'manual'
+    let evaMode = 'manual';
 
-    // Toggle entre modo automático e manual
     if (btnAnaliseAuto) {
         btnAnaliseAuto.addEventListener('click', () => {
             evaMode = 'auto';
@@ -625,47 +714,46 @@ document.addEventListener('click', (e) => {
     }
 
     if (btnOtimizar && resultadoEva && loadingEva) {
-    btnOtimizar.addEventListener('click', async () => {
-        const relatorio = document.getElementById('relatorioInput')?.value || '';
-        
-        if (evaMode === 'manual' && !relatorio) {
-            alert('Cole os dados de campanha no campo de texto!');
-            return;
-        }
+        btnOtimizar.addEventListener('click', async () => {
+            const relatorio = document.getElementById('relatorioInput')?.value || '';
+            if (evaMode === 'manual' && !relatorio) { alert('Cole os dados de campanha no campo de texto!'); return; }
+            loadingEva.classList.remove('hidden');
+            resultadoEva.classList.add('hidden');
+            btnOtimizar.disabled = true;
+            try {
+                const payload = evaMode === 'auto' ? { auto: true } : { relatorio: relatorio };
+                const response = await fetch('/api/campanhas/otimizar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                loadingEva.classList.add('hidden');
+                resultadoEva.classList.remove('hidden');
+                resultadoEva.innerHTML = data.resultado ? converterMarkdown(data.resultado) : (data.erro || "Erro ao analisar.");
+            } catch (e) {
+                loadingEva.classList.add('hidden');
+                resultadoEva.classList.remove('hidden');
+                resultadoEva.innerText = "Erro de conexão.";
+            }
+            btnOtimizar.disabled = false;
+        });
+    }
 
-        loadingEva.classList.remove('hidden');
-        resultadoEva.classList.add('hidden');
-        btnOtimizar.disabled = true;
-
-        try {
-            const payload = evaMode === 'auto' 
-                ? { auto: true }
-                : { relatorio: relatorio };
-            
-            const response = await fetch('/api/campanhas/otimizar', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-            loadingEva.classList.add('hidden');
-            resultadoEva.classList.remove('hidden');
-            resultadoEva.innerHTML = data.resultado ? converterMarkdown(data.resultado) : (data.erro || "Erro ao analisar.");
-        } catch (e) {
-            loadingEva.classList.add('hidden');
-            resultadoEva.classList.remove('hidden');
-            resultadoEva.innerText = "Erro de conexão.";
-        }
-        btnOtimizar.disabled = false;
-    });
+    // ==========================================
+    // SECURITY HELPERS & RENDERING
+    // ==========================================
+    function escapeHTML(str) {
+        if (!str) return "";
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
     }
 
     function converterMarkdown(text) {
         if (typeof text !== 'string') return "";
-        let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        let safe = escapeHTML(text);
+        let html = safe.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
         html = html.replace(/\n/g, '<br>');
         return html;
@@ -675,9 +763,7 @@ document.addEventListener('click', (e) => {
         try {
             if (typeof text === 'object') return text;
             return JSON.parse(text);
-        } catch(e) {
-            return text;
-        }
+        } catch(e) { return text; }
     }
 
     function renderJsonCards(campaignData, campaignId = null) {
@@ -685,7 +771,6 @@ document.addEventListener('click', (e) => {
         
         let html = `<div class="json-campaign-results" data-campaign-id="${campaignId || ''}">`;
         
-        // Botões de Ação Superior
         if (campaignId) {
             html += `<div style="text-align:right; margin-bottom:15px; display:flex; gap:10px; justify-content:flex-end;">
                         <button class="btn-secondary" onclick="generateAgencyProposal('${campaignId}')" style="padding: 6px 12px; font-size: 0.8em; border-color: #3b82f6; color: #3b82f6;">📄 Gerar Proposta Comercial</button>
@@ -693,7 +778,6 @@ document.addEventListener('click', (e) => {
                     </div>`;
         }
 
-        // TABS DE VARIAÇÃO A/B (GLOBAL)
         html += `
         <div class="variation-tabs" style="margin-bottom:20px; display:flex; gap:10px; justify-content:center;">
             <button class="tab-btn active" onclick="switchVariation('a', this)">🚀 Variacao A (Ganho)</button>
@@ -701,18 +785,15 @@ document.addEventListener('click', (e) => {
             <button class="tab-btn" onclick="switchVariation('c', this)">🔍 Variacao C (Curiosidade)</button>
         </div>`;
 
-        // 1. FACEBOOK ADS (Com Oracle Score integrado)
         if (campaignData.facebook_ad) {
             const ad = campaignData.facebook_ad;
-            html += `<h3>🚀 Meta Ads (A/B Test)</h3>`;
-            html += `
-            <div class="oracle-score-container glass-panel">
+            html += `<h3>🚀 Meta Ads (A/B Test)</h3>
+            <div class="oracle-score-container glass-panel facebook-card">
                 <div class="score-circular-area">
                     <div class="circular-progress" id="main-score-circle" style="--progress: 0deg;">
                         <span class="score-value" id="main-score-val">--</span>
                     </div>
                     <span class="score-label" id="main-score-status">Pronto</span>
-                    
                     <div class="metrics-list">
                         ${renderMetricRow('Clareza', 'score-clareza')}
                         ${renderMetricRow('Urgência', 'score-urgencia', 'orange')}
@@ -721,18 +802,14 @@ document.addEventListener('click', (e) => {
                         ${renderMetricRow('Especificidade', 'score-espec')}
                     </div>
                 </div>
-                
                 <div class="editor-area">
                     <label style="font-size:0.8em; opacity:0.7;">Headline:</label>
-                    <input type="text" class="draft-edit field-headline ab-content" data-a="${ad.headline_a || ad.headline || ''}" data-b="${ad.headline_b || ''}" data-c="${ad.headline_c || ''}" value="${ad.headline_a || ad.headline || ''}">
-                    
+                    <input type="text" class="draft-edit field-headline ab-content" data-a="${escapeHTML(ad.headline_a || ad.headline || '')}" data-b="${escapeHTML(ad.headline_b || '')}" data-c="${escapeHTML(ad.headline_c || '')}" value="${escapeHTML(ad.headline_a || ad.headline || '')}">
                     <label style="font-size:0.8em; opacity:0.7; margin-top:10px;">Texto Principal:</label>
-                    <textarea class="draft-edit field-primary-text ab-content" data-a="${ad.primary_text_a || ad.primary_text || ''}" data-b="${ad.primary_text_b || ''}" data-c="${ad.primary_text_c || ''}" rows="6" oninput="debounceScore(this)">${ad.primary_text_a || ad.primary_text || ''}</textarea>
-                    
+                    <textarea class="draft-edit field-primary-text ab-content" data-a="${escapeHTML(ad.primary_text_a || ad.primary_text || '')}" data-b="${escapeHTML(ad.primary_text_b || '')}" data-c="${escapeHTML(ad.primary_text_c || '')}" rows="6" oninput="debounceScore(this)">${escapeHTML(ad.primary_text_a || ad.primary_text || '')}</textarea>
                     <div class="improvement-box">
                         <strong>💡 Sugestão IA:</strong> <span id="score-dica">Escreva algo para analisar...</span>
                     </div>
-                    
                     <div class="flex-row" style="margin-top:12px; border-top: 1px solid rgba(255,255,255,0.05); padding-top:10px; justify-content: space-between; align-items:center;">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <label class="switch">
@@ -743,16 +820,14 @@ document.addEventListener('click', (e) => {
                         </div>
                         <div id="autopilot-status-${campaignId}" style="font-size:0.7rem; color:#10b981; visibility:hidden;">✨ IA Otimizando...</div>
                     </div>
-                    
                     <div class="flex-row" style="margin-top:12px;">
-                        <button class="ad-cta" disabled>${ad.cta || 'Saiba Mais'}</button>
+                        <button class="ad-cta" disabled>${escapeHTML(ad.cta || 'Saiba Mais')}</button>
                         <button class="btn-publish-meta" onclick="publishToMeta(this)">🚀 Publicar Escolhida</button>
                     </div>
                 </div>
             </div>`;
         }
 
-        // 2. INSTAGRAM POSTS (A/B)
         if (campaignData.instagram_posts) {
             html += `<h3>📱 Instagram Posts</h3><div class="cards-grid">`;
             campaignData.instagram_posts.forEach((post, i) => {
@@ -761,104 +836,71 @@ document.addEventListener('click', (e) => {
                     <h4>Post ${i+1}</h4>
                     <img src="${post.image_url || ''}" class="post-image" onerror="this.src='https://placehold.co/1024x1024/2c3e50/ffffff?text=Imagem'">
                     <label style="font-size:0.8em; opacity:0.7;">Legenda:</label>
-                    <textarea class="draft-edit field-caption" rows="4">${post.caption || ''}</textarea>
+                    <textarea class="draft-edit field-caption" rows="4">${escapeHTML(post.caption || '')}</textarea>
+                    <label style="font-size:0.8em; opacity:0.7; margin-top:5px;">Hashtags:</label>
+                    <textarea class="draft-edit field-hashtags" rows="2">${escapeHTML(post.hashtags || '')}</textarea>
                 </div>`;
             });
             html += `</div>`;
         }
 
-        // 3. EMAIL (A/B)
         if (campaignData.email) {
             const em = campaignData.email;
-            html += `<h3>📧 E-mail Marketing</h3>`;
-            html += `
+            html += `<h3>📧 E-mail Marketing</h3>
             <div class="json-card email-card">
                 <label style="font-size:0.8em; opacity:0.7;">Assunto:</label>
-                <input type="text" class="draft-edit field-subject ab-content" data-a="${em.subject_a || em.subject || ''}" data-b="${em.subject_b || ''}" value="${em.subject_a || em.subject || ''}">
+                <input type="text" class="draft-edit field-subject ab-content" data-a="${escapeHTML(em.subject_a || em.subject || '')}" data-b="${escapeHTML(em.subject_b || '')}" value="${escapeHTML(em.subject_a || em.subject || '')}">
                 <label style="font-size:0.8em; opacity:0.7; margin-top:10px;">Corpo do E-mail:</label>
-                <textarea class="draft-edit field-body ab-content" data-a="${em.body_a || em.body || ''}" data-b="${em.body_b || ''}" rows="6">${em.body_a || em.body || ''}</textarea>
+                <textarea class="draft-edit field-body ab-content" data-a="${escapeHTML(em.body_a || em.body || '')}" data-b="${escapeHTML(em.body_b || '')}" rows="6">${escapeHTML(em.body_a || em.body || '')}</textarea>
             </div>`;
         }
 
-        // 4. VIDEO SCRIPT
         if (campaignData.video_script) {
-            html += `<h3>🎬 Vídeo Gerado por IA</h3>`;
-            html += `<div class="json-card video-card">`;
-            
-            if (campaignData.video_script.video_url) {
-                html += `
-                <div class="video-player-container">
-                    <video controls loop playsinline class="generated-video" preload="metadata">
-                        <source src="${campaignData.video_script.video_url}" type="video/mp4">
-                        Seu navegador não suporta vídeo HTML5.
-                    </video>
-                    <a href="${campaignData.video_script.video_url}" download class="btn-download-video" target="_blank">⬇️ Baixar Vídeo</a>
+            const vs = campaignData.video_script;
+            html += `<h3>🎬 Vídeo Gerado por IA</h3><div class="json-card video-card">`;
+            if (vs.video_url) {
+                html += `<div class="video-player-container">
+                    <video controls loop playsinline class="generated-video" preload="metadata"><source src="${vs.video_url}" type="video/mp4"></video>
+                    <a href="${vs.video_url}" download class="btn-download-video" target="_blank">⬇️ Baixar Vídeo</a>
                 </div>`;
-            } else if (campaignData.video_script.image_url) {
-                html += `<img src="${campaignData.video_script.image_url}" class="post-image" alt="Thumbnail Vídeo" onerror="this.src='https://placehold.co/1024x1024/2c3e50/ffffff?text=Thumbnail'">`;
+            } else if (vs.image_url) {
+                html += `<img src="${vs.image_url}" class="post-image" alt="Thumbnail">`;
             }
-
-            if (campaignData.video_script.audio_url) {
-                html += `
-                <div class="audio-player-container" style="margin: 15px 0; padding: 15px; background: rgba(139,92,246,0.1); border-radius: 12px; border: 1px solid rgba(139,92,246,0.3);">
-                    <p style="margin-bottom: 8px; font-size: 0.9em; font-weight: 600;">🎙️ Narração em Áudio (Voz IA)</p>
-                    <audio controls style="width: 100%; border-radius: 8px;">
-                        <source src="${campaignData.video_script.audio_url}" type="audio/mpeg">
-                    </audio>
-                    <a href="${campaignData.video_script.audio_url}" download style="display:inline-block; margin-top:8px; font-size:0.8em; color: #8b5cf6;">⬇️ Baixar Áudio .mp3</a>
+            if (vs.audio_url) {
+                html += `<div class="audio-player-container" style="margin: 15px 0; padding: 15px; background: rgba(139,92,246,0.1); border-radius: 12px;">
+                    <p style="margin-bottom: 8px; font-size: 0.9em;">🎙️ Narração em Áudio</p>
+                    <audio controls style="width: 100%;"><source src="${vs.audio_url}" type="audio/mpeg"></audio>
                 </div>`;
             }
-            
             html += `
-                <div class="script-step"><span class="badge red">Gancho (0-3s)</span>
-                    <textarea class="draft-edit field-hook" rows="2">${campaignData.video_script.hook || ''}</textarea>
-                </div>
-                <div class="script-step"><span class="badge blue">Conteúdo</span>
-                    <textarea class="draft-edit field-video-body" rows="3">${campaignData.video_script.body || ''}</textarea>
-                </div>
-                <div class="script-step"><span class="badge green">CTA</span>
-                    <textarea class="draft-edit field-video-cta" rows="2">${campaignData.video_script.cta || ''}</textarea>
-                </div>
+                <div class="script-step"><span class="badge red">Gancho</span><textarea class="draft-edit field-hook" rows="2">${escapeHTML(vs.hook || '')}</textarea></div>
+                <div class="script-step"><span class="badge blue">Conteúdo</span><textarea class="draft-edit field-video-body" rows="3">${escapeHTML(vs.body || '')}</textarea></div>
+                <div class="script-step"><span class="badge green">CTA</span><textarea class="draft-edit field-video-cta" rows="2">${escapeHTML(vs.cta || '')}</textarea></div>
                 <div class="flex-row" style="margin-top:15px;">`;
-            
-            if (campaignData.video_script.video_url) {
-                html += `<button class="btn-publish-tiktok" onclick="publishToTikTok(this, '${campaignData.video_script.video_url}')">🎵 Publicar no TikTok Ads</button>`;
+            if (vs.video_url) {
+                html += `<button class="btn-publish-tiktok" onclick="publishToTikTok(this, '${vs.video_url}')">🎵 Publicar no TikTok</button>`;
             }
-            html += `<button class="btn-publish-meta" onclick="publishToMeta(this)">🚀 Publicar no Meta Ads</button>
-                </div>
-            </div>`;
+            html += `<button class="btn-publish-meta" onclick="publishToMeta(this)">🚀 Publicar no Meta</button></div></div>`;
         }
-
         html += '</div>';
         return html;
     }
 
     function renderMetricRow(label, id, colorClass = '') {
-        return `
-        <div class="metric-row">
-            <div class="metric-info">
-                <span>${label}</span>
-                <span id="${id}-val">0</span>
-            </div>
-            <div class="metric-bar-bg">
-                <div class="metric-bar-fill ${colorClass}" id="${id}-bar" style="width: 0%;"></div>
-            </div>
+        return `<div class="metric-row">
+            <div class="metric-info"><span>${label}</span><span id="${id}-val">0</span></div>
+            <div class="metric-bar-bg"><div class="metric-bar-fill ${colorClass}" id="${id}-bar" style="width: 0%;"></div></div>
         </div>`;
     }
 
     window.switchVariation = function(version, btn) {
-        // Update active button
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-
-        // Update all fields with data attributes
         document.querySelectorAll('.ab-content').forEach(el => {
             const content = el.dataset[version] || el.dataset['a'];
             if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
                 el.value = content;
-                if (el.classList.contains('field-primary-text')) {
-                    debounceScore(el); // Rescore on switch
-                }
+                if (el.classList.contains('field-primary-text')) debounceScore(el);
             }
         });
     }
@@ -871,66 +913,43 @@ document.addEventListener('click', (e) => {
 
     async function updateAdScore(text) {
         if (!text || text.length < 10) return;
-        
         try {
             const res = await fetch('/api/modules/score', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                 body: JSON.stringify({ texto: text })
             });
             const data = await res.json();
-            
             if (data.score !== undefined) {
-                // Update Main Circle
                 const circle = document.getElementById('main-score-circle');
                 const val = document.getElementById('main-score-val');
                 const status = document.getElementById('main-score-status');
-                
                 if (circle) {
                     circle.style.setProperty('--progress', `${data.score * 3.6}deg`);
                     val.innerText = data.score;
                     status.innerText = data.status || "Bom";
                     status.style.color = data.score > 70 ? '#10b981' : '#f59e0b';
                 }
-
-                // Update Metrics
                 updateMetric('score-clareza', data.metrics?.clareza);
                 updateMetric('score-urgencia', data.metrics?.urgencia);
                 updateMetric('score-emocao', data.metrics?.emocao);
                 updateMetric('score-ctr', data.metrics?.ctr);
                 updateMetric('score-espec', data.metrics?.especificidade);
-
-                // Update Tip
                 const tip = document.getElementById('score-dica');
                 if (tip) tip.innerText = data.dica || "...";
             }
-        } catch (e) {
-            console.error("Score failed", e);
-        }
+        } catch (e) {}
     }
 
     function updateMetric(id, val) {
         const bar = document.getElementById(`${id}-bar`);
         const text = document.getElementById(`${id}-val`);
-        if (bar && val !== undefined) {
-            bar.style.width = `${val}%`;
-            text.innerText = val;
-        }
+        if (bar && val !== undefined) { bar.style.width = `${val}%`; text.innerText = val; }
     }
 
     window.saveCampaignEdits = async function(campaignId, btn) {
         const container = btn.closest('.json-campaign-results');
-        const campaignData = {
-            instagram_posts: [],
-            facebook_ad: {},
-            email: {},
-            video_script: {}
-        };
-
-        // Scrape Instagram Posts
+        const campaignData = { instagram_posts: [], facebook_ad: {}, email: {}, video_script: {} };
         container.querySelectorAll('.instagram-card').forEach(card => {
             campaignData.instagram_posts.push({
                 image_url: card.querySelector('img')?.src || '',
@@ -938,8 +957,6 @@ document.addEventListener('click', (e) => {
                 hashtags: card.querySelector('.field-hashtags').value
             });
         });
-
-        // Scrape Meta Ads
         const metaCard = container.querySelector('.facebook-card');
         if (metaCard) {
             campaignData.facebook_ad = {
@@ -948,8 +965,6 @@ document.addEventListener('click', (e) => {
                 cta: metaCard.querySelector('.ad-cta').innerText
             };
         }
-
-        // Scrape Email
         const emailCard = container.querySelector('.email-card');
         if (emailCard) {
             campaignData.email = {
@@ -957,8 +972,6 @@ document.addEventListener('click', (e) => {
                 body: emailCard.querySelector('.field-body').value
             };
         }
-
-        // Scrape Video Script
         const videoCard = container.querySelector('.video-card');
         if (videoCard) {
             campaignData.video_script = {
@@ -970,370 +983,208 @@ document.addEventListener('click', (e) => {
                 cta: videoCard.querySelector('.field-video-cta').value
             };
         }
-
-        btn.disabled = true;
-        btn.innerText = "⏳ Salvando...";
-
+        btn.disabled = true; btn.innerText = "⏳ Salvando...";
         try {
             const res = await fetch('/api/campaigns/update', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                 body: JSON.stringify({ id: campaignId, result_text: campaignData })
             });
             const data = await res.json();
             alert(data.mensagem || data.erro);
-        } catch (e) {
-            alert("Erro ao salvar alterações.");
-        }
-        btn.disabled = false;
-        btn.innerText = "💾 Salvar Alterações no Banco";
+        } catch (e) { alert("Erro ao salvar alterações."); }
+        btn.disabled = false; btn.innerText = "💾 Salvar Alterações";
     }
 
     window.publishToMeta = async function(btn) {
-        if (!confirm("Deseja enviar esta campanha para o rascunho do seu Gerenciador de Anúncios da Meta?")) return;
-        
-        // Excellence: Scrape the edited text
+        if (!confirm("Enviar para rascunho do Gerenciador de Anúncios Meta?")) return;
         const container = btn.closest('.json-campaign-results');
         const metaCard = container.querySelector('.facebook-card');
         const headline = metaCard ? metaCard.querySelector('.field-headline').value : 'Campanha Copilot IA';
-
         try {
             const res = await fetch('/api/campaigns/publish_to_meta', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                 body: JSON.stringify({ action: 'publish', campaign_name: headline })
             });
             const data = await res.json();
             alert(data.mensagem || data.erro);
-        } catch (e) {
-            alert("Erro ao publicar anúncio.");
-        }
+        } catch (e) { alert("Erro ao publicar anúncio."); }
     }
 
     window.publishToTikTok = async function(btn, videoUrl) {
-        if (!confirm("Deseja enviar este vídeo para o TikTok Ads Manager?")) return;
-
-        // Excellence: Scrape the edited text
+        if (!confirm("Enviar este vídeo para o TikTok Ads Manager?")) return;
         const container = btn.closest('.json-campaign-results');
         const videoCard = container.querySelector('.video-card');
         const headline = videoCard ? videoCard.querySelector('.field-hook').value : 'Campanha Copilot IA';
-
         try {
             const res = await fetch('/api/campaigns/publish_to_tiktok', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                 body: JSON.stringify({ video_url: videoUrl, headline: headline })
             });
             const data = await res.json();
             alert(data.mensagem || data.erro);
-        } catch (e) {
-            alert("Erro ao publicar no TikTok.");
-        }
+        } catch (e) { alert("Erro ao publicar no TikTok."); }
     }
 
-    // ==========================================
-    // LEAD HUNTER FRONTEND
-    // ==========================================
     const btnBuscarLeads = document.getElementById('btnBuscarLeads');
     if (btnBuscarLeads) {
         btnBuscarLeads.addEventListener('click', async () => {
             const nicho = document.getElementById('leadNicho').value.trim();
             const cidade = document.getElementById('leadCidade').value.trim();
-            
-            if (!nicho || !cidade) {
-                alert("Por favor, preencha o nicho e a cidade.");
-                return;
-            }
-
+            if (!nicho || !cidade) { alert("Preencha o nicho e a cidade."); return; }
             const loadingLeads = document.getElementById('loadingLeads');
             const leadsListArea = document.getElementById('leadsListArea');
             const leadsTableBody = document.getElementById('leadsTableBody');
-
-            loadingLeads.classList.remove('hidden');
-            leadsListArea.classList.add('hidden');
+            loadingLeads.classList.remove('hidden'); leadsListArea.classList.add('hidden');
             btnBuscarLeads.disabled = true;
-
             try {
                 const res = await fetch('/api/leads/buscar', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                     body: JSON.stringify({ nicho, cidade })
                 });
                 const data = await res.json();
-                
                 leadsTableBody.innerHTML = '';
                 if (data.leads && data.leads.length > 0) {
                     data.leads.forEach(lead => {
                         const zapClean = (lead.telefone || '').replace(/\D/g, '');
                         const zapLink = zapClean.length >= 10 ? `https://wa.me/55${zapClean}` : '#';
-                        
-                        leadsTableBody.innerHTML += `
-                            <tr>
-                                <td><strong>${lead.nome}</strong><br><small style="opacity:0.6;">Rating: ${lead.nota}</small></td>
-                                <td><a href="${zapLink}" target="_blank" class="btn-whatsapp">🟢 ${lead.telefone || 'N/A'}</a></td>
-                                <td><a href="${lead.site}" target="_blank" style="color:var(--accent); font-size:0.8em;">${lead.site ? 'Ver Website' : 'N/A'}</a></td>
-                                <td>
-                                    <div style="font-size:0.75rem; color:#f87171;"><strong>⚠️ Dor:</strong> ${lead.dor || 'Detectando...'}</div>
-                                    <div style="font-size:0.75rem; color:#60a5fa;"><strong>💎 Oportunidade:</strong> ${lead.oportunidade}%</div>
-                                </td>
-                                <td>
-                                    <button class="btn-prospect" onclick="prospectarLead('${lead.nome.replace(/'/g, "")}', '${lead.site}')">✨ Prospectar com IA</button>
-                                </td>
-                            </tr>
-                        `;
+                        leadsTableBody.innerHTML += `<tr>
+                            <td><strong>${escapeHTML(lead.nome)}</strong></td>
+                            <td><a href="${zapLink}" target="_blank" class="btn-whatsapp">🟢 ${escapeHTML(lead.telefone || 'N/A')}</a></td>
+                            <td><a href="${lead.site}" target="_blank" style="color:var(--accent); font-size:0.8em;">${lead.site ? 'Website' : 'N/A'}</a></td>
+                            <td><div style="font-size:0.75rem; color:#f87171;">⚠️ ${escapeHTML(lead.dor || 'Detectando...')}</div></td>
+                            <td><button class="btn-prospect" onclick="prospectarLead('${lead.nome.replace(/'/g, "")}', '${lead.site}')">✨ Prospectar</button></td>
+                        </tr>`;
                     });
                     leadsListArea.classList.remove('hidden');
-                } else {
-                    alert("Nenhum lead encontrado.");
-                }
-            } catch (e) {
-                alert("Erro ao buscar leads.");
-            } finally {
-                loadingLeads.classList.add('hidden');
-                btnBuscarLeads.disabled = false;
-            }
+                } else { alert("Nenhum lead encontrado."); }
+            } catch (e) { alert("Erro ao buscar leads."); } finally { loadingLeads.classList.add('hidden'); btnBuscarLeads.disabled = false; }
         });
     }
 
     window.prospectarLead = async function(nome, site) {
-        const modalMsg = prompt(`Gerando abordagem para ${nome}. Qual produto você quer oferecer?`, "Marketing Digital e Tráfego Pago");
+        const modalMsg = prompt(`Gerando abordagem para ${nome}. Qual produto você quer oferecer?`, "Marketing Digital");
         if (!modalMsg) return;
-
         try {
             const res = await fetch('/api/leads/pitch', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                 body: JSON.stringify({ nome, site, meu_produto: modalMsg })
             });
             const data = await res.json();
-            
-            if (data.pitch) {
-                const finalPitch = encodeURIComponent(data.pitch);
-                const zapUrl = `https://wa.me/?text=${finalPitch}`;
-                window.open(zapUrl, '_blank');
-            }
-        } catch (e) {
-            alert("Erro ao gerar pitch.");
-        }
+            if (data.pitch) window.open(`https://wa.me/?text=${encodeURIComponent(data.pitch)}`, '_blank');
+        } catch (e) { alert("Erro ao gerar pitch."); }
     };
 
-    // ==========================================
-    // ELITE FEATURES: CALENDAR & HOOKS
-    // ==========================================
     const btnGerarCalendario = document.getElementById('btnGerarCalendario');
     if (btnGerarCalendario) {
         btnGerarCalendario.addEventListener('click', async () => {
             const calendarArea = document.getElementById('calendarArea');
             const calendarContent = document.getElementById('calendarContent');
-            
-            btnGerarCalendario.disabled = true;
-            btnGerarCalendario.innerText = "📅 Gerando Plano Mestre...";
-
+            btnGerarCalendario.disabled = true; btnGerarCalendario.innerText = "📅 Gerando...";
             try {
                 const res = await fetch('/api/calendar/generate', {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 const data = await res.json();
-                
                 if (data.calendario) {
                     calendarContent.innerHTML = '';
                     data.calendario.forEach(item => {
-                        calendarContent.innerHTML += `
-                            <div class="glass-panel" style="padding:15px; font-size:0.85rem; border-left:4px solid var(--accent);">
-                                <div style="font-weight:700; color:var(--accent);">DIA ${item.dia}</div>
-                                <div style="margin:5px 0;">${item.titulo}</div>
-                                <div style="font-size:0.7rem; opacity:0.6;">${item.tipo} | ${item.objetivo}</div>
-                            </div>
-                        `;
+                        calendarContent.innerHTML += `<div class="glass-panel" style="padding:15px; border-left:4px solid var(--accent);">
+                            <div style="font-weight:700; color:var(--accent);">DIA ${item.dia}</div>
+                            <div>${escapeHTML(item.titulo)}</div>
+                            <div style="font-size:0.7rem; opacity:0.6;">${escapeHTML(item.tipo)}</div>
+                        </div>`;
                     });
                     calendarArea.classList.remove('hidden');
                 }
-            } catch (e) {
-                alert("Erro ao gerar calendário.");
-            } finally {
-                btnGerarCalendario.disabled = false;
-                btnGerarCalendario.innerText = "⚡ Gerar Plano de 30 Dias Agora";
-            }
+            } catch (e) { alert("Erro ao gerar calendário."); } finally { btnGerarCalendario.disabled = false; btnGerarCalendario.innerText = "⚡ Gerar Plano de 30 Dias"; }
         });
     }
 
-    // Carregar Hooks ao abrir a aba
-    const hooksTab = document.querySelector('[data-tab="hooks"]');
-    if (hooksTab) {
-        hooksTab.addEventListener('click', async () => {
-            const container = document.getElementById('hooksContainer');
-            container.innerHTML = '<div class="spinner"></div>';
-            
-            try {
-                const res = await fetch('/api/hooks/list', {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await res.json();
-                
-                container.innerHTML = '';
-                data.hooks.forEach(h => {
-                    container.innerHTML += `
-                        <div class="glass-panel fade-in" style="padding:20px;">
-                            <span class="tag" style="background:rgba(255,255,255,0.05); margin-bottom:10px;">${h.tipo}</span>
-                            <p style="font-weight:600; font-size:1.1rem; line-height:1.4;">"${h.hook}"</p>
-                            <button class="btn-secondary" style="margin-top:15px; width:100%;" onclick="copyToClipboard('${h.hook.replace(/'/g, "\\'")}')">📋 Copiar Hook</button>
-                        </div>
-                    `;
-                });
-            } catch (e) {}
-        });
-    }
+    window.copyToClipboard = (text) => { navigator.clipboard.writeText(text); alert("Copiado!"); }
 
-    window.copyToClipboard = (text) => {
-        navigator.clipboard.writeText(text);
-        alert("Copiado!");
-    }
-
-    // FUNNEL CLONER
     const btnClonarFunil = document.getElementById('btnClonarFunil');
     if (btnClonarFunil) {
         btnClonarFunil.addEventListener('click', async () => {
             const url = document.getElementById('funnelUrl').value;
             const resArea = document.getElementById('funnelResult');
-            
-            btnClonarFunil.disabled = true;
-            btnClonarFunil.innerText = "🌪️ Desconstruindo Funil...";
-            
+            btnClonarFunil.disabled = true; btnClonarFunil.innerText = "🌪️ Analisando...";
             try {
                 const res = await fetch('/api/funnel/clone', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                     body: JSON.stringify({ url })
                 });
                 const data = await res.json();
                 resArea.innerHTML = converterMarkdown(data.analise);
                 resArea.classList.remove('hidden');
-            } catch (e) {
-                alert("Erro ao clonar funil.");
-            } finally {
-                btnClonarFunil.disabled = false;
-                btnClonarFunil.innerText = "🌪️ Analisar e Clonar";
-            }
+            } catch (e) { alert("Erro ao clonar funil."); } finally { btnClonarFunil.disabled = false; btnClonarFunil.innerText = "🌪️ Analisar e Clonar"; }
         });
     }
 
-    // VIRAL MODE
     const btnViralCheck = document.getElementById('btnViralCheck');
     if (btnViralCheck) {
         btnViralCheck.addEventListener('click', async () => {
             const content = document.getElementById('viralContent');
-            btnViralCheck.innerText = "⚡ Mapeando tendências...";
-            
+            btnViralCheck.innerText = "⚡ Mapeando...";
             try {
-                const res = await fetch('/api/viral/trends', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                const res = await fetch('/api/viral/trends', { method: 'POST', headers: { 'Authorization': `Bearer ${authToken}` } });
                 const data = await res.json();
-                
                 content.innerHTML = '<h3 style="margin-top:20px;">🔥 Tendências Detectadas (24h)</h3>';
                 data.trends.forEach(t => {
-                    content.innerHTML += `
-                        <div class="glass-panel" style="margin-top:10px; border-left:4px solid #f59e0b;">
-                            <strong>${t.tema}</strong>
-                            <p style="font-size:0.85rem; opacity:0.8;">${t.oportunidade}</p>
-                        </div>
-                    `;
+                    content.innerHTML += `<div class="glass-panel" style="margin-top:10px; border-left:4px solid #f59e0b;">
+                        <strong>${escapeHTML(t.tema)}</strong><p style="font-size:0.85rem; opacity:0.8;">${escapeHTML(t.oportunidade)}</p>
+                    </div>`;
                 });
                 content.classList.remove('hidden');
-            } catch (e) {} finally {
-                btnViralCheck.innerText = "🔥 Detectar Tendências Agora";
-            }
+            } catch (e) {} finally { btnViralCheck.innerText = "🔥 Detectar Tendências"; }
         });
     }
 
-    // MARKETPLACE LOGIC
     window.loadMarketplace = async function() {
         const grid = document.getElementById('marketGrid');
         grid.innerHTML = '<div class="spinner"></div>';
-        
         try {
             const res = await fetch('/api/marketplace/list');
             const data = await res.json();
-            
             grid.innerHTML = '';
             data.templates.forEach(t => {
-                grid.innerHTML += `
-                    <div class="glass-panel fade-in" style="padding:20px; display:flex; flex-direction:column; gap:10px;">
-                        <div style="font-size:0.7rem; color:var(--accent); text-transform:uppercase; font-weight:700;">${t.niche}</div>
-                        <h4 style="margin:0;">${t.title}</h4>
-                        <div style="font-size:1.2rem; font-weight:700; margin:10px 0;">€ ${t.price}</div>
-                        <div style="font-size:0.8rem; opacity:0.6;">Autor: ${t.author_name || 'MKT Team'}</div>
-                        <button class="btn-primary" style="margin-top:auto;" onclick="buyTemplate('${t.id}')">🛒 Clonar Agora</button>
-                    </div>
-                `;
+                grid.innerHTML += `<div class="glass-panel fade-in" style="padding:20px; display:flex; flex-direction:column; gap:10px;">
+                    <div style="font-size:0.7rem; color:var(--accent); text-transform:uppercase; font-weight:700;">${escapeHTML(t.niche)}</div>
+                    <h4 style="margin:0;">${escapeHTML(t.title)}</h4>
+                    <div style="font-size:1.2rem; font-weight:700; margin:10px 0;">€ ${t.price}</div>
+                    <button class="btn-primary" style="margin-top:auto;" onclick="buyTemplate('${t.id}')">🛒 Clonar Agora</button>
+                </div>`;
             });
         } catch (e) { grid.innerHTML = "Erro ao carregar mercado."; }
     }
 
     window.buyTemplate = (id) => {
-        alert("Simulação de Checkout Stripe: Processando pagamento...");
-        setTimeout(() => alert("Template Clonado com Sucesso! Verifique suas campanhas."), 1500);
+        alert("Simulação de Checkout Stripe...");
+        setTimeout(() => alert("Template Clonado com Sucesso!"), 1500);
     }
 
-    const marketTab = document.querySelector('[data-tab="marketplace"]');
-    if (marketTab) {
-        marketTab.addEventListener('click', loadMarketplace);
-    }
-
-    // COMPETITOR RADAR
     const btnWatchCompetitor = document.getElementById('btnWatchCompetitor');
     if (btnWatchCompetitor) {
         btnWatchCompetitor.addEventListener('click', async () => {
             const url = document.getElementById('compUrl').value;
             const log = document.getElementById('radarLog');
-            const area = document.getElementById('radarTimeline');
-            
-            btnWatchCompetitor.innerText = "📡 Sincronizando Radar...";
-            
+            btnWatchCompetitor.innerText = "📡 Sincronizando...";
             try {
                 const res = await fetch('/api/competitors/watch', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                     body: JSON.stringify({ url })
                 });
                 const data = await res.json();
-                
                 alert(data.status);
-                area.classList.remove('hidden');
-                log.innerHTML = `
-                    <div class="glass-panel" style="border-left:4px solid #3b82f6;">
-                        <strong>📡 Radar Ativo: ${url}</strong>
-                        <p style="font-size:0.8rem; margin-top:5px;">Aguardando alterações no site ou novos anúncios...</p>
-                    </div>
-                `;
-            } catch (e) {
-                alert("Erro ao ativar radar.");
-            } finally {
-                btnWatchCompetitor.innerText = "📡 Ativar Radar";
-            }
+                log.innerHTML = `<div class="glass-panel" style="border-left:4px solid #3b82f6;"><strong>📡 Radar Ativo: ${escapeHTML(url)}</strong></div>`;
+            } catch (e) { alert("Erro ao ativar radar."); } finally { btnWatchCompetitor.innerText = "📡 Ativar Radar"; }
         });
     }
 
@@ -1341,40 +1192,19 @@ document.addEventListener('click', (e) => {
         const status = document.getElementById(`autopilot-status-${id}`);
         if (checkbox.checked) {
             status.style.visibility = 'visible';
-            alert("🤖 Modo Autopilot Ativado! A IA irá monitorar as métricas e otimizar este anúncio automaticamente a cada 24h.");
-        } else {
-            status.style.visibility = 'hidden';
-        }
+            alert("🤖 Modo Autopilot Ativado!");
+        } else { status.style.visibility = 'hidden'; }
     }
 
     window.generateAgencyProposal = async function(campaignId) {
         try {
-            const res = await fetch(`/api/campaigns/proposal/${campaignId}`, {
-                headers: { 'Authorization': `Bearer ${authToken}` }
-            });
+            const res = await fetch(`/api/campaigns/proposal/${campaignId}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
             const data = await res.json();
-            
             if (data.html) {
                 const win = window.open("", "_blank");
-                win.document.write(data.html);
-                win.document.close();
-            } else {
-                alert(data.erro || "Erro ao gerar proposta.");
-            }
-        } catch (e) {
-            alert("Erro de conexão.");
-        }
+                win.document.write(data.html); win.document.close();
+            } else { alert(data.erro || "Erro ao gerar proposta."); }
+        } catch (e) { alert("Erro de conexão."); }
     }
-    window.switchTab = function(tabId) {
-        console.log("DEBUG: Switching to tab", tabId);
-        document.querySelectorAll('.nav-links li, .nav-item').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll(`[data-tab="${tabId}"], .nav-item[onclick*="${tabId}"]`).forEach(el => el.classList.add('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => { p.classList.add('hidden'); p.classList.remove('active'); });
-        const target = document.getElementById(tabId);
-        if (target) { target.classList.remove('hidden'); target.classList.add('active'); target.classList.add('fade-in'); }
-    };
-    document.querySelectorAll('.nav-links li').forEach(li => {
-        li.addEventListener('click', () => { const id = li.getAttribute('data-tab'); if (id) switchTab(id); });
-    });
 }
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initApp); } else { initApp(); }

@@ -9,6 +9,9 @@
     --aura-gold: #d4af37;
     --aura-card: #2a2d35;
     --aura-accent: #747ee6;
+    --accent: #8b5cf6;
+    --accent-light: #a78bfa;
+    --accent-glow: rgba(139, 92, 246, 0.5);
     --bg-glass: rgba(255, 255, 255, 0.04);
     --text-primary: #ffffff;
     --text-secondary: rgba(255, 255, 255, 0.6);
@@ -17,6 +20,9 @@
     --radius: 32px;
     --radius-sm: 16px;
     --shadow-glow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    --gradient-hero: linear-gradient(135deg, #ffffff 0%, #a78bfa 100%);
+    --gradient-btn: linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%);
+    --gradient-generate: linear-gradient(135deg, #f472b6 0%, #8b5cf6 100%);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1758,3 +1764,15 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 .btn-fix-seo:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3); }
 
+
+/* Job Monitor Styles */
+.spinner-small { width: 16px; height: 16px; border: 2px solid rgba(139, 92, 246, 0.1); border-top: 2px solid var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.job-badge { display: flex; align-items: center; gap: 8px; background: rgba(139, 92, 246, 0.15); color: var(--accent-light); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid rgba(139, 92, 246, 0.2); }
+.job-badge:hover { background: rgba(139, 92, 246, 0.25); transform: scale(1.05); }
+.badge-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
+.active-job-card { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); }
+.job-info { flex: 1; }
+.job-progress-mini { width: 100px; height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+.job-progress-fill-mini { height: 100%; background: var(--accent); transition: width 0.3s ease; }

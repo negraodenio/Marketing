@@ -45,11 +45,23 @@ CREATE TABLE IF NOT EXISTS campaign_analyses (
     created_at timestamp with time zone DEFAULT now()
 );
 
--- 5. DESTRAVAR ACESSO (RLS desativado para MVP)
-ALTER TABLE campaigns DISABLE ROW LEVEL SECURITY;
-ALTER TABLE user_meta_tokens DISABLE ROW LEVEL SECURITY;
-ALTER TABLE user_tiktok_tokens DISABLE ROW LEVEL SECURITY;
-ALTER TABLE campaign_analyses DISABLE ROW LEVEL SECURITY;
+-- 5. DESTRAVAR ACESSO (RLS ATIVADO PARA PRODUÇÃO)
+ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only see their own campaigns" ON campaigns FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can only insert their own campaigns" ON campaigns FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can only update their own campaigns" ON campaigns FOR UPDATE USING (auth.uid() = user_id);
+
+ALTER TABLE user_meta_tokens ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only see their own meta tokens" ON user_meta_tokens FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can only upsert their own meta tokens" ON user_meta_tokens FOR ALL USING (auth.uid() = user_id);
+
+ALTER TABLE user_tiktok_tokens ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only see their own tiktok tokens" ON user_tiktok_tokens FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can only upsert their own tiktok tokens" ON user_tiktok_tokens FOR ALL USING (auth.uid() = user_id);
+
+ALTER TABLE campaign_analyses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can only see their own analyses" ON campaign_analyses FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can only insert their own analyses" ON campaign_analyses FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 6. Função para controle de custos (Opcional - para futuro)
 CREATE OR REPLACE FUNCTION increment_image_usage(p_user_id UUID, p_cost_usd FLOAT)

@@ -118,13 +118,13 @@
                 <span id="userEmailDisplay" class="user-email">usuario@email.com</span>
             </div>
             <ul class="nav-links">
-                <li class="active" data-tab="tab-wizard"><span>01</span> Dashboard</li>
-                <li data-tab="tab-campaigns"><span>02</span> Campanhas</li>
-                <li data-tab="tab-oracle"><span>03</span> Oracle Performance</li>
-                <li data-tab="tab-leads"><span>04</span> Lead Hunter</li>
-                <li data-tab="tab-auto"><span>05</span> Automacoes</li>
-                <li data-tab="tab-eva"><span>06</span> Eva Brain</li>
-                <li data-tab="tab-config"><span>07</span> Configurações</li>
+                <li class="active" data-tab="wizard"><span>01</span> Dashboard</li>
+                <li data-tab="history"><span>02</span> Campanhas</li>
+                <li data-tab="evabrain"><span>03</span> Eva Brain / Oracle</li>
+                <li data-tab="leads"><span>04</span> Lead Hunter</li>
+                <li data-tab="automations"><span>05</span> Automacoes</li>
+                <li data-tab="funnel"><span>06</span> Clonador de Funil</li>
+                <li data-tab="config"><span>07</span> Configurações</li>
             </ul>
             <div class="sidebar-footer">
                 <div class="connections-section">
@@ -169,7 +169,7 @@
                         <h3 style="font-size: 0.85rem; font-weight: 600;">Clonador de Funil</h3>
                         <p style="font-size: 10px; opacity: 0.4;">Recrie funis de sucesso.</p>
                     </div>
-                    <div class="module-card active" onclick="switchTab('tab-oracle')">
+                    <div class="module-card active" onclick="switchTab('evabrain')">
                         <div style="font-size: 1.5rem; margin-bottom: 10px;">🧿</div>
                         <h3 style="font-size: 0.85rem; font-weight: 600;">Oracle Score</h3>
                         <p style="font-size: 10px; opacity: 0.4;">Previsão de desempenho.</p>
@@ -300,6 +300,9 @@
                                 <small>Qualquer negócio</small>
                             </div>
                         </div>
+                        <div style="margin-top: 20px; text-align: center;">
+                            <button class="btn-secondary" style="width: auto; padding: 10px 30px;" onclick="goToStep(1)">← Voltar</button>
+                        </div>
                     </div>
 
                     <!-- Step 3 -->
@@ -314,7 +317,10 @@
                             <input type="url" id="wizConcorrente" placeholder="Ex: https://site-do-concorrente.com" class="wizard-input" style="border-color: #3b82f6;">
                             <small style="opacity:0.6;">A IA vai analisar o site e criar algo superior.</small>
                         </div>
-                        <button class="btn-primary" onclick="generateMarketIntelligence()">Analisar Mercado & SEO →</button>
+                        <div class="flex-row" style="margin-top: 20px; gap: 10px;">
+                            <button class="btn-secondary" onclick="goToStep(2)">← Voltar</button>
+                            <button class="btn-primary" onclick="generateMarketIntelligence()">Analisar Mercado & SEO →</button>
+                        </div>
                     </div>
 
                     <!-- Step 4: Market Intelligence (Semrush Style) -->
@@ -334,7 +340,10 @@
                             </div>
                         </div>
 
-                        <button class="btn-primary" onclick="nextWizard(5)">Confirmar Objetivo →</button>
+                        <div class="flex-row" style="margin-top: 20px; gap: 10px;">
+                            <button class="btn-secondary" onclick="goToStep(3)">← Voltar</button>
+                            <button class="btn-primary" onclick="nextWizard(5)">Confirmar Objetivo →</button>
+                        </div>
                     </div>
 
                     <!-- Step 5 -->
@@ -347,7 +356,10 @@
                             <label class="obj-card"><input type="radio" name="objetivo" value="Aumentar seguidores e criar autoridade no nicho"><span class="obj-icon">📈</span><strong>Crescer Perfil</strong><small>Ganhar seguidores e autoridade</small></label>
                         </div>
                         <input type="hidden" id="wizObjetivo">
-                        <button id="btnGerarMagica" class="btn-generate">Gerar campanha completa</button>
+                        <div class="flex-row" style="margin-top: 20px; gap: 10px;">
+                            <button class="btn-secondary" onclick="goToStep(4)">← Voltar</button>
+                            <button id="btnGerarMagica" class="btn-generate" style="margin-top:0;">Gerar campanha completa</button>
+                        </div>
                     </div>
 
                     <!-- Loading -->
@@ -411,8 +423,27 @@
                     <h1>📚 Minhas Campanhas</h1>
                     <p>Todas as campanhas geradas ficam salvas na nuvem. Acesse de qualquer dispositivo.</p>
                 </header>
+
+                <!-- NOVO: Monitor de Jobs Ativos -->
+                <div id="activeJobsArea" class="hidden" style="margin-bottom: 30px;">
+                    <div class="glass-panel" style="padding: 20px; border-left: 4px solid var(--accent); background: rgba(139, 92, 246, 0.05);">
+                        <h3 style="font-size: 1rem; margin-bottom: 15px; color: var(--accent); display: flex; align-items: center; gap: 10px;">
+                            <div class="spinner-small"></div> Tarefas em Segundo Plano
+                        </h3>
+                        <div id="activeJobsList" style="display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Cards de Jobs Ativos -->
+                        </div>
+                    </div>
+                </div>
+
                 <div class="glass-panel" style="padding: 2rem;">
-                    <button id="btnLoadHistory" class="btn-secondary" style="margin-bottom: 20px;">🔄 Atualizar</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                        <button id="btnLoadHistory" class="btn-secondary">🔄 Atualizar</button>
+                        <div id="jobBadge" class="job-badge hidden" onclick="switchTab('tab-history')">
+                            <span class="badge-dot"></span> 
+                            <span id="jobBadgeText">1 tarefa ativa</span>
+                        </div>
+                    </div>
                     <div id="historyList">
                         <p class="placeholder-text">Carregando suas campanhas...</p>
                     </div>

@@ -20,7 +20,9 @@ create table if not exists campaign_scores (
   created_at      timestamptz default now()
 );
 create index if not exists idx_scores_user on campaign_scores(user_id, created_at desc);
-alter table campaign_scores disable row level security; -- Desativado para MVP conforme padrão anterior
+alter table campaign_scores enable row level security;
+create policy "Users can only see their own scores" on campaign_scores for select using (auth.uid() = user_id);
+create policy "Users can only insert their own scores" on campaign_scores for insert with check (auth.uid() = user_id);
 
 -- 2. ANÁLISES DE FUNIL
 create table if not exists funil_analyses (
@@ -31,7 +33,9 @@ create table if not exists funil_analyses (
   resultado        jsonb,       -- { concorrente:{...}, superior:{...} }
   created_at       timestamptz default now()
 );
-alter table funil_analyses disable row level security;
+alter table funil_analyses enable row level security;
+create policy "Users can only see their own funil analyses" on funil_analyses for select using (auth.uid() = user_id);
+create policy "Users can only insert their own funil analyses" on funil_analyses for insert with check (auth.uid() = user_id);
 
 -- 3. CALENDÁRIOS DE CONTEÚDO
 create table if not exists content_calendars (
@@ -44,7 +48,9 @@ create table if not exists content_calendars (
   dias        jsonb not null,  -- array de dias gerados
   created_at  timestamptz default now()
 );
-alter table content_calendars disable row level security;
+alter table content_calendars enable row level security;
+create policy "Users can only see their own calendars" on content_calendars for select using (auth.uid() = user_id);
+create policy "Users can only insert their own calendars" on content_calendars for insert with check (auth.uid() = user_id);
 
 -- 4. HOOKS VIRAIS
 create table if not exists viral_hooks (
@@ -60,6 +66,8 @@ create table if not exists viral_hooks (
   created_at   timestamptz default now()
 );
 create index if not exists idx_hooks_semana on viral_hooks(semana desc, nicho, angulo);
+alter table viral_hooks enable row level security;
+create policy "Viral hooks are public for reading" on viral_hooks for select using (true);
 
 -- 5. A/B TESTS
 create table if not exists ab_tests (
@@ -73,7 +81,9 @@ create table if not exists ab_tests (
   status        text default 'draft',  -- draft | exported | live | completed
   created_at    timestamptz default now()
 );
-alter table ab_tests disable row level security;
+alter table ab_tests enable row level security;
+create policy "Users can only see their own AB tests" on ab_tests for select using (auth.uid() = user_id);
+create policy "Users can only insert their own AB tests" on ab_tests for insert with check (auth.uid() = user_id);
 
 -- 6. CAMPANHAS VIRAIS
 create table if not exists viral_campaigns (
@@ -90,4 +100,6 @@ create table if not exists viral_campaigns (
   melhor_horario  text,
   created_at      timestamptz default now()
 );
-alter table viral_campaigns disable row level security;
+alter table viral_campaigns enable row level security;
+create policy "Users can only see their own viral campaigns" on viral_campaigns for select using (auth.uid() = user_id);
+create policy "Users can only insert their own viral campaigns" on viral_campaigns for insert with check (auth.uid() = user_id);
