@@ -10,7 +10,6 @@ import asyncio
 from bs4 import BeautifulSoup
 import edge_tts
 from flask import Flask, request, jsonify, render_template, redirect
-from dotenv import load_dotenv
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 import threading
@@ -160,23 +159,47 @@ def scrape_concorrente(url):
         print(f"⚠️ Erro ao fazer scrape da URL {url}: {e}", flush=True)
         return ""
 
+def upload_to_storage(file_path, filename, bucket_name="marketing_assets"):
+    """Sobe um arquivo para o Supabase Storage e retorna a URL pública"""
+    if not supabase_admin: return None
+    try:
+        # Garantir que o bucket existe (tenta criar se falhar)
+        try:
+            supabase_admin.storage.create_bucket(bucket_name, options={"public": True})
+        except: pass
+
+        with open(file_path, 'rb') as f:
+            supabase_admin.storage.from_(bucket_name).upload(filename, f, {"content-type": "audio/mpeg"})
+            
+        res = supabase_admin.storage.from_(bucket_name).get_public_url(filename)
+        return res
+    except Exception as e:
+        print(f"❌ Erro no upload para Storage: {e}", flush=True)
+        return None
+
 async def generate_tts_async(text, output_path, voice="pt-BR-AntonioNeural"):
     """Gera áudio usando edge-tts de forma assíncrona"""
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_path)
 
 def gerar_audio_tts(roteiro_completo, produto):
-    """Função síncrona wrapper para gerar o áudio"""
+    """Função síncrona wrapper para gerar o áudio via Supabase Storage"""
     if not roteiro_completo: return None
     
-    os.makedirs('static/audio', exist_ok=True)
+    # Em ambientes serverless como Vercel, devemos usar /tmp
+    temp_dir = "/tmp" if os.name != 'nt' else "static/audio"
+    os.makedirs(temp_dir, exist_ok=True)
+    
     filename = f"tts_{uuid.uuid4().hex}.mp3"
-    filepath = os.path.join('static', 'audio', filename)
+    filepath = os.path.join(temp_dir, filename)
     
     try:
         print(f"Gerando TTS para: {produto}...", flush=True)
         asyncio.run(generate_tts_async(roteiro_completo, filepath))
-        return f"/static/audio/{filename}"
+        
+        # Sobe para o Storage (Vercel é read-only, não podemos servir local)
+        public_url = upload_to_storage(filepath, filename)
+        return public_url or f"/static/audio/{filename}" # Fallback local se não for Vercel
     except Exception as e:
         print(f"Erro ao gerar TTS: {e}", flush=True)
         return None
@@ -375,14 +398,8 @@ def gerar_video_siliconflow(roteiro_completo, produto, plataforma="Multicanal"):
     print(f"🎬 DEBUG: Tentando SiliconFlow Vídeo Fallback...", flush=True)
     
     headers = {"Authorization": f"Bearer {SILICONFLOW_API_KEY}", "Content-Type": "application/json"}
-    # Nota: O modelo de vídeo da SiliconFlow pode variar. Usamos o padrão genérico de vídeo se disponível.
-    payload = {
-        "model": "deepseek-ai/DeepSeek-V3", # Placeholder para roteirização se necessário ou modelo de vídeo real
-        "prompt": prompt_en,
-        "negative_prompt": "text, letters, watermark"
-    }
-    # Por enquanto, se não houver um endpoint estável de vídeo na SiliconFlow no SDK, retornamos None
-    # Mas deixamos a estrutura pronta para quando a API de vídeo deles estabilizar.
+    # Atualmente a SiliconFlow prioriza modelos de imagem e chat. 
+    # Vídeo será integrado via SDK oficial assim que o endpoint Pro estabilizar.
     return None
 
 def gerar_video_com_fallback(roteiro_completo, produto, plataforma="Multicanal"):
@@ -479,10 +496,15 @@ def chamar_ia(prompt, system_message="Você é um assistente de marketing especi
     try:
         response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=45)
         response.raise_for_status()
-        return response.json()['choices'][0]['message']['content']
+        data = response.json()
+        if data and 'choices' in data and len(data['choices']) > 0:
+            content = data['choices'][0].get('message', {}).get('content')
+            if content: return content
+        print(f"⚠️ OpenRouter retorno inesperado: {data}", flush=True)
+        return "Erro na estrutura da IA."
     except Exception as e:
         print(f"❌ Erro OpenRouter: {e}", flush=True)
-        return "Erro na geração da IA."
+        return "Falha na conexão com IA."
 
 # ==========================================
 # REVISÃO AUTOMÁTICA DE TEXTOS (Pós-processamento)
