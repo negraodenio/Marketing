@@ -10,9 +10,60 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="/static/css/style.css?v=4.0">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@700;800&display=swap');
+        :root {
+            --accent-primary: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.25);
+            --bg-main: #0a0b10;
+            --bg-card: #12141c;
+            --border-dim: rgba(255, 255, 255, 0.08);
+            --border-highlight: rgba(255, 255, 255, 0.15);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --radius-lg: 24px;
+            --radius-md: 12px;
+            --shadow-pro: 0 20px 50px rgba(0, 0, 0, 0.6);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-main); color: var(--text-primary); font-family: 'Inter', sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        .pro-dashboard { display: flex; min-height: 100vh; }
+        .pro-sidebar { width: 280px; background: var(--bg-card); border-right: 1px solid var(--border-dim); padding: 32px 24px; display: flex; flex-direction: column; }
+        .pro-main { flex: 1; padding: 48px; max-width: 1200px; margin: 0 auto; }
+        h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; letter-spacing: -0.02em; }
+        .json-card { background: var(--bg-card); border: 1px solid var(--border-dim); border-radius: var(--radius-lg); padding: 40px; margin-bottom: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .json-card:hover { border-color: var(--border-highlight); box-shadow: var(--shadow-pro); transform: translateY(-2px); }
+        .field-group { margin-bottom: 28px; display: flex; flex-direction: column; width: 100%; }
+        .field-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; padding-left: 4px; }
+        .draft-edit { width: 100%; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-dim); border-radius: var(--radius-md); padding: 18px; color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: 1rem; line-height: 1.6; transition: 0.2s; outline: none; resize: vertical; display: block; min-height: 56px; }
+        .draft-edit:focus { border-color: var(--accent-primary); background: rgba(0, 0, 0, 0.4); box-shadow: 0 0 0 4px var(--accent-glow); }
+        .oracle-score-container { display: grid; grid-template-columns: 280px 1fr; gap: 60px; align-items: center; background: rgba(255, 255, 255, 0.02); padding: 32px; border-radius: var(--radius-md); border: 1px solid var(--border-dim); }
+        .circular-progress { width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(var(--accent-primary) calc(var(--progress) * 3.6deg), rgba(255,255,255,0.05) 0deg); display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 20px; }
+        .circular-progress::after { content: ""; position: absolute; width: 130px; height: 130px; background: #12141c; border-radius: 50%; }
+        .score-value { position: relative; z-index: 2; font-size: 3rem; font-weight: 800; font-family: 'Outfit'; color: #fff; }
+        .metrics-list { display: flex; flex-direction: column; gap: 20px; }
+        .metric-info { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 8px; color: var(--text-secondary); }
+        .metric-bar-bg { height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 100px; overflow: hidden; }
+        .metric-bar-fill { height: 100%; background: var(--accent-primary); border-radius: 100px; transition: width 1s cubic-bezier(0.16, 1, 0.3, 1); }
+        .btn-ninja { background: var(--accent-primary); color: white; border: none; padding: 14px 28px; border-radius: var(--radius-md); font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 12px; text-decoration: none; justify-content: center; }
+        .btn-ninja:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4); }
+        .btn-secondary { background: transparent; border: 1px solid var(--border-dim); color: var(--text-secondary); }
+        .variation-tabs { display: flex; gap: 12px; margin-bottom: 40px; justify-content: center; background: rgba(255, 255, 255, 0.03); padding: 8px; border-radius: 100px; width: fit-content; margin-left: auto; margin-right: auto; }
+        .tab-btn { background: transparent; border: none; color: var(--text-secondary); padding: 10px 24px; border-radius: 100px; cursor: pointer; font-weight: 700; font-size: 0.85rem; transition: 0.2s; }
+        .tab-btn.active { background: var(--accent-primary); color: white; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
+        .post-image, .generated-video { width: 100%; border-radius: var(--radius-md); border: 1px solid var(--border-dim); margin-bottom: 32px; display: block; }
+        .video-player-container { position: relative; border-radius: var(--radius-md); overflow: hidden; margin-bottom: 32px; }
+        .btn-download-video { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); padding: 10px 20px; border-radius: 100px; color: white; text-decoration: none; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.15); transition: 0.2s; z-index: 10; }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; }
+        .btn-publish-meta { background: #0668E1; color: white; }
+        .btn-publish-tiktok { background: #ff0050; color: white; }
+    </style>
     <script src="/static/js/modules.js?v=4.0" defer></script>
-    <script src="/static/js/app.js?v=4.0" defer></script>
+    <script src="/static/js/aura_v1.js" defer></script>
 </head>
 <body class="pro-body">
 
@@ -52,11 +103,11 @@
         
         <!-- Sidebar Navigation -->
         <aside class="pro-sidebar">
-            <div class="brand-section">
-                <div class="brand-logo">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <div class="brand-section" style="margin-bottom: 48px; display: flex; align-items: center; gap: 16px;">
+                <div class="brand-logo" style="width: 44px; height: 44px; background: linear-gradient(135deg, var(--accent-primary), #8b5cf6); border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 </div>
-                <h2 class="brand-name">MKTPilot</h2>
+                <h2 class="brand-name" style="font-size: 1.3rem; font-weight: 800; background: linear-gradient(to right, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">MKTPilot Pro</h2>
             </div>
 
             <div class="nav-group">
@@ -151,20 +202,20 @@
                             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 32px;">A IA otimizará o conteúdo de acordo com as regras de cada canal.</p>
                             
                             <div class="pro-grid">
-                                <div class="pro-card" onclick="selectPlatform('TikTok')" style="cursor: pointer;">
-                                    <div style="font-size: 1.5rem; margin-bottom: 16px;">📱</div>
+                                <div class="pro-card platform-card" onclick="selectPlatform('TikTok')" style="cursor: pointer; transition: 0.2s;">
+                                    <div style="font-size: 1.8rem; margin-bottom: 16px;">📱</div>
                                     <h3>TikTok Ads</h3>
-                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;">Foco em UGC e conteúdo nativo viral.</p>
+                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;">Algoritmos de retenção e conteúdo nativo viral.</p>
                                 </div>
-                                <div class="pro-card" onclick="selectPlatform('Meta/Instagram')" style="cursor: pointer;">
-                                    <div style="font-size: 1.5rem; margin-bottom: 16px;">📸</div>
+                                <div class="pro-card platform-card" onclick="selectPlatform('Meta/Instagram')" style="cursor: pointer; transition: 0.2s;">
+                                    <div style="font-size: 1.8rem; margin-bottom: 16px;">📸</div>
                                     <h3>Instagram / Meta</h3>
-                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;">Foco em estética premium e conversão direta.</p>
+                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;">Estética premium e funis de conversão direta.</p>
                                 </div>
-                                <div class="pro-card" onclick="selectPlatform('Multicanal')" style="cursor: pointer;">
-                                    <div style="font-size: 1.5rem; margin-bottom: 16px;">🚀</div>
+                                <div class="pro-card platform-card" onclick="selectPlatform('Multicanal')" style="cursor: pointer; transition: 0.2s;">
+                                    <div style="font-size: 1.8rem; margin-bottom: 16px;">🚀</div>
                                     <h3>Omnichannel</h3>
-                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;">Geração adaptativa para todos os canais.</p>
+                                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;">Geração adaptativa para escala multicanal.</p>
                                 </div>
                             </div>
                         </div>
@@ -210,20 +261,18 @@
                             <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Finalizar Configuração</h2>
                             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 32px;">Defina o objetivo final para a orquestração da IA.</p>
                             
-                            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px;">
-                                <label class="pro-card" style="display: flex; align-items: center; gap: 16px; cursor: pointer;">
-                                    <input type="radio" name="objetivo" value="Vendas" checked>
-                                    <div>
-                                        <strong>Vendas Diretas</strong>
-                                        <p style="font-size: 0.75rem; color: var(--text-secondary);">Foco em fechamento imediato e ROI.</p>
-                                    </div>
+                            <div class="pro-grid" style="margin-bottom: 32px;">
+                                <label class="json-card pro-card-selection" style="padding: 24px; position: relative;">
+                                    <input type="radio" name="objetivo" value="Vendas" checked style="position: absolute; top: 20px; right: 20px; transform: scale(1.4); accent-color: var(--accent-primary);">
+                                    <div style="font-size: 2.5rem; margin-bottom: 16px;">💰</div>
+                                    <h4 style="margin-bottom: 8px;">Vendas Diretas</h4>
+                                    <p style="font-size: 0.85rem; color: var(--text-secondary);">Otimizar para conversão imediata, ROI e fechamento rápido no tráfego direto.</p>
                                 </label>
-                                <label class="pro-card" style="display: flex; align-items: center; gap: 16px; cursor: pointer;">
-                                    <input type="radio" name="objetivo" value="WhatsApp">
-                                    <div>
-                                        <strong>Geração de Leads (WhatsApp)</strong>
-                                        <p style="font-size: 0.75rem; color: var(--text-secondary);">Foco em iniciar conversas e consultas.</p>
-                                    </div>
+                                <label class="json-card pro-card-selection" style="padding: 24px; position: relative;">
+                                    <input type="radio" name="objetivo" value="WhatsApp" style="position: absolute; top: 20px; right: 20px; transform: scale(1.4); accent-color: var(--accent-primary);">
+                                    <div style="font-size: 2.5rem; margin-bottom: 16px;">💬</div>
+                                    <h4 style="margin-bottom: 8px;">Geração de Leads</h4>
+                                    <p style="font-size: 0.85rem; color: var(--text-secondary);">Foco em iniciar conversas qualificadas no WhatsApp e captura de contatos.</p>
                                 </label>
                             </div>
                             
@@ -286,6 +335,67 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- TAB: HISTORY -->
+                <section id="tab-history" class="tab-pane hidden fade-in">
+                    <div class="dashboard-header" style="margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div>
+                            <h1 style="font-size: 2rem;">Arquivo de <span style="color: var(--accent-primary);">Campanhas</span></h1>
+                            <p style="color: var(--text-secondary);">Histórico completo de gerações e rascunhos salvos.</p>
+                        </div>
+                        <button id="btnLoadHistory" class="btn-ninja" style="background: transparent; border: 1px solid var(--border-dim); color: var(--text-secondary);">🔄 Atualizar Lista</button>
+                    </div>
+                    <div id="historyList" class="pro-grid">
+                        <!-- History items populated by JS -->
+                    </div>
+                </section>
+
+                <!-- TAB: EVA BRAIN -->
+                <section id="tab-evabrain" class="tab-pane hidden fade-in">
+                    <div class="dashboard-header" style="margin-bottom: 32px;">
+                        <h1 style="font-size: 2rem;">Eva <span style="color: var(--accent-primary);">Oracle</span></h1>
+                        <p style="color: var(--text-secondary);">Otimização massiva de contexto e análise de performance preditiva.</p>
+                    </div>
+                    <div class="pro-card" style="max-width: 800px;">
+                        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+                            <button id="btnAnaliseManual" class="tab-btn active">Entrada Manual</button>
+                            <button id="btnAnaliseAuto" class="tab-btn">Análise de Conta</button>
+                        </div>
+                        <div id="manualInputArea">
+                            <label class="input-label">Cole o Relatório ou Copy para Otimização</label>
+                            <textarea id="relatorioInput" class="input-pro" style="height: 200px;" placeholder="Ex: Relatório de métricas do Facebook ou um texto longo de vendas..."></textarea>
+                        </div>
+                        <button id="btnOtimizar" class="btn-ninja" style="width: 100%; justify-content: center; margin-top: 24px; height: 56px;">Executar Inteligência Eva</button>
+                        
+                        <div id="loadingEva" class="hidden" style="text-align: center; padding: 40px;">
+                            <div class="spinner" style="width: 32px; height: 32px; margin: 0 auto 16px;"></div>
+                            <p>Eva está processando o contexto massivo...</p>
+                        </div>
+                        <div id="resultadoEva" class="hidden pro-card" style="margin-top: 32px; background: rgba(0,0,0,0.2); border-color: var(--accent-primary);">
+                            <!-- Results here -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB: CONFIG / BRANDING -->
+                <section id="tab-config" class="tab-pane hidden fade-in">
+                    <div class="dashboard-header" style="margin-bottom: 32px;">
+                        <h1 style="font-size: 2rem;">Brand <span style="color: var(--accent-primary);">Kit</span></h1>
+                        <p style="color: var(--text-secondary);">Defina a alma e a voz da sua marca para a IA.</p>
+                    </div>
+                    <div class="pro-card" style="max-width: 600px;">
+                        <div class="input-group">
+                            <label class="input-label">Tom de Voz</label>
+                            <input type="text" id="configTomDeVoz" class="input-pro" placeholder="Ex: Persuasivo, Irônico, Profissional...">
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Público-Alvo Detalhado</label>
+                            <textarea id="configPublicoAlvo" class="input-pro" style="height: 120px;" placeholder="Ex: Homens de 25-40 anos interessados em investimentos..."></textarea>
+                        </div>
+                        <button id="btnSaveConfig" class="btn-ninja" style="width: 100%; justify-content: center;">Salvar Identidade</button>
+                        <p id="configSaveMsg" class="hidden" style="color: #10b981; font-size: 0.8rem; margin-top: 12px; text-align: center;">✅ Identidade da Marca Atualizada!</p>
+                    </div>
+                </section>
             </div>
         </main>
 
@@ -295,13 +405,121 @@
         </div>
     </div>
 
-    <style>
-        @keyframes spin { to { transform: rotate(360deg); } }
-        /* Scrollbar styling for a pro feel */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-main); }
-        ::-webkit-scrollbar-thumb { background: var(--bg-card); border-radius: 10px; border: 2px solid var(--bg-main); }
-        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-    </style>
+    <script>
+        // FORCED OVERRIDE TO BYPASS CACHE
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("Applying Aura UI Overrides...");
+            
+            window.renderMetricRow = function(label, id, colorClass = '') {
+                return `<div class="metric-row">
+                    <div class="metric-info"><span>${label}</span><span id="${id}-val">0</span></div>
+                    <div class="metric-bar-bg"><div class="metric-bar-fill ${colorClass}" id="${id}-bar" style="width: 0%;"></div></div>
+                </div>`;
+            };
+
+            window.updateAdScore = async function(text) {
+                if (!text || text.length < 10) return;
+                try {
+                    const res = await fetch('/api/modules/score', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                        body: JSON.stringify({ copy: text })
+                    });
+                    const data = await res.json();
+                    if (data.score !== undefined) {
+                        const circle = document.getElementById('main-score-circle');
+                        const val = document.getElementById('main-score-val');
+                        const status = document.getElementById('main-score-status');
+                        if (circle) {
+                            circle.style.setProperty('--progress', data.score);
+                            val.innerText = data.score;
+                            status.innerText = data.grade || "Bom";
+                            status.style.color = data.score > 70 ? '#10b981' : '#f59e0b';
+                        }
+                        updateMetric('score-clareza', data.clareza);
+                        updateMetric('score-urgencia', data.urgencia);
+                        updateMetric('score-emocao', data.emocional);
+                        updateMetric('score-ctr', data.ctr_estimado);
+                        updateMetric('score-espec', data.especificidade);
+                        const tip = document.getElementById('score-dica');
+                        if (tip) tip.innerText = data.tip || "...";
+                    }
+                } catch (e) { console.error("Score Error:", e); }
+            };
+
+            window.renderJsonCards = function(campaignData, campaignId = null) {
+                if (!campaignData || typeof campaignData !== 'object') return converterMarkdown(String(campaignData));
+                let html = `<div class="json-campaign-results" data-campaign-id="${campaignId || ''}">`;
+                if (campaignId) {
+                    html += `<div style="text-align:right; margin-bottom:32px; display:flex; gap:16px; justify-content:flex-end;">
+                                <button class="btn-ninja btn-secondary" onclick="generateAgencyProposal('${campaignId}')">📄 Gerar Proposta</button>
+                                <button class="btn-ninja btn-secondary" onclick="saveCampaignEdits('${campaignId}', this)">💾 Salvar Edição</button>
+                            </div>`;
+                }
+                html += `<div class="variation-tabs">
+                    <button class="tab-btn active" onclick="switchVariation('a', this)">🚀 Variacao A (Ganho)</button>
+                    <button class="tab-btn" onclick="switchVariation('b', this)">⚠️ Variacao B (Medo)</button>
+                    <button class="tab-btn" onclick="switchVariation('c', this)">🔍 Variacao C (Curiosidade)</button>
+                </div>`;
+                if (campaignData.facebook_ad) {
+                    const ad = campaignData.facebook_ad;
+                    html += `<div class="json-card">
+                        <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg> Meta Ads (A/B Test)</h3>
+                        <div class="oracle-score-container">
+                            <div class="score-circular-area">
+                                <div class="circular-progress" id="main-score-circle" style="--progress: 0;">
+                                    <span class="score-value" id="main-score-val">--</span>
+                                </div>
+                                <span class="score-label" id="main-score-status">Analisando...</span>
+                                <div class="metrics-list" style="margin-top:24px; width:100%;">
+                                    ${renderMetricRow('Clareza', 'score-clareza')}
+                                    ${renderMetricRow('Urgência', 'score-urgencia')}
+                                    ${renderMetricRow('Emoção', 'score-emocao')}
+                                    ${renderMetricRow('CTR Estimado', 'score-ctr')}
+                                    ${renderMetricRow('Especificidade', 'score-espec')}
+                                </div>
+                            </div>
+                            <div class="editor-area">
+                                <div class="field-group"><label class="field-label">Headline do Anúncio</label>
+                                    <input type="text" class="draft-edit field-headline ab-content" data-a="${escapeHTML(ad.headline_a || ad.headline || '')}" data-b="${escapeHTML(ad.headline_b || '')}" data-c="${escapeHTML(ad.headline_c || '')}" value="${escapeHTML(ad.headline_a || ad.headline || '')}">
+                                </div>
+                                <div class="field-group"><label class="field-label">Texto Principal (Copywriting)</label>
+                                    <textarea class="draft-edit field-primary-text ab-content" data-a="${escapeHTML(ad.primary_text_a || ad.primary_text || '')}" data-b="${escapeHTML(ad.primary_text_b || '')}" data-c="${escapeHTML(ad.primary_text_c || '')}" rows="8" oninput="debounceScore(this)">${escapeHTML(ad.primary_text_a || ad.primary_text || '')}</textarea>
+                                </div>
+                                <div style="background:rgba(99,102,241,0.05); border:1px solid rgba(99,102,241,0.1); padding:16px; border-radius:12px; margin-bottom:24px;">
+                                    <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5;"><strong style="color:var(--accent-primary);">💡 Sugestão Oracle:</strong> <span id="score-dica">Comece a digitar...</span></p>
+                                </div>
+                                <button class="btn-ninja btn-publish-meta" style="width:100%;" onclick="publishToMeta(this)">🚀 Publicar Campanha no Meta</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }
+                if (campaignData.instagram_posts) {
+                    html += `<h2 style="margin: 40px 0 24px; display:flex; align-items:center; gap:12px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg> Instagram Creative Feed</h2><div class="pro-grid">`;
+                    campaignData.instagram_posts.forEach((post, i) => {
+                        html += `<div class="json-card"><h4>Post Criativo ${i+1}</h4><img src="${post.image_url || ''}" class="post-image">
+                            <div class="field-group"><label class="field-label">Legenda Estratégica</label><textarea class="draft-edit field-caption" rows="6">${escapeHTML(post.caption || '')}</textarea></div>
+                            <div class="field-group"><label class="field-label">Hashtags de Alcance</label><textarea class="draft-edit field-hashtags" rows="2">${escapeHTML(post.hashtags || '')}</textarea></div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                }
+                if (campaignData.video_script) {
+                    const vs = campaignData.video_script;
+                    html += `<div class="json-card"><h3>🎥 Produção de Vídeo IA</h3>`;
+                    if (vs.video_url) html += `<div class="video-player-container"><video controls loop playsinline class="generated-video"><source src="${vs.video_url}" type="video/mp4"></video><a href="${vs.video_url}" download class="btn-download-video">⬇️ Download Video</a></div>`;
+                    html += `<div class="field-group"><label class="field-label" style="color:#ef4444;">🔥 Hook (O Gancho)</label><textarea class="draft-edit field-hook" rows="2">${escapeHTML(vs.hook || '')}</textarea></div>
+                        <div class="field-group"><label class="field-label" style="color:#3b82f6;">📝 Conteúdo / Storytelling</label><textarea class="draft-edit field-video-body" rows="4">${escapeHTML(vs.body || '')}</textarea></div>
+                        <div class="field-group"><label class="field-label" style="color:#10b981;">🎯 CTA (Chamada de Ação)</label><textarea class="draft-edit field-video-cta" rows="2">${escapeHTML(vs.cta || '')}</textarea></div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:32px;">
+                            <button class="btn-ninja btn-publish-tiktok" onclick="publishToTikTok(this, '${vs.video_url}')">🎵 TikTok</button>
+                            <button class="btn-ninja btn-publish-meta" onclick="publishToMeta(this)">🚀 Meta</button>
+                        </div></div>`;
+                }
+                html += '</div>';
+                return html;
+            };
+        });
+    </script>
 </body>
 </html>

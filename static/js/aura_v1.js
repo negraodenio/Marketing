@@ -1267,4 +1267,12 @@ document.addEventListener('click', (e) => {
         } catch (e) { alert("Erro de conexão."); }
     }
 }
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initApp); } else { initApp(); }
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("%c🚀 Aura UI v1.0 Loaded", "color: #6366f1; font-weight: bold; font-size: 14px;");
+        initApp();
+    });
+} else {
+    console.log("%c🚀 Aura UI v1.0 Loaded", "color: #6366f1; font-weight: bold; font-size: 14px;");
+    initApp();
+}
