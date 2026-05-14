@@ -3,126 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MKTPilot Pro — Marketing Engineering</title>
+    <title>MKTPilot Pro | O Padrão Ouro do Marketing Digital</title>
     <link rel="stylesheet" href="/static/css/landing.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 <body>
 
-    <header class="lp-header">
-        <div class="logo-section">
-            <div class="logo-box"></div>
+    <!-- Header -->
+    <header>
+        <div class="logo">
+            <div class="logo-icon"></div>
             <span>MKTPilot Pro</span>
         </div>
-        <nav>
-            <ul class="nav-links">
-                <li><a href="#infra">Infra</a></li>
-                <li><a href="#inteligencia">Inteligência</a></li>
-                <li><a href="/login">Login</a></li>
-            </ul>
+        <nav class="nav-links">
+            <a href="#solucao">Solução</a>
+            <a href="#funcionalidades">Tecnologia</a>
+            <a href="#agencias">Agências</a>
         </nav>
-        <a href="/register" class="btn-eng btn-eng-primary" style="padding: 10px 20px; font-size: 0.8rem;">Get Access</a>
+        <div style="display: flex; gap: 16px;">
+            <a href="/login" class="btn-cta btn-secondary" style="padding: 12px 24px; font-size: 0.9rem;">Login</a>
+            <a href="/register" class="btn-cta btn-primary" style="padding: 12px 24px; font-size: 0.9rem;">Acessar Plataforma</a>
+        </div>
     </header>
 
+    <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <span class="mono-label">Architecture v4.2.0</span>
-            <h1>Marketing de <br><span style="color:var(--lp-accent);">Precisão.</span></h1>
-            <p>O MKTPilot Pro orquestra agentes de IA para dominar prospecção, mídia paga e automação em escala industrial.</p>
-            <div style="display: flex; gap: 12px; justify-content: center;">
-                <a href="/register" class="btn-eng btn-eng-primary">Deploy Platform</a>
-                <a href="#infra" class="btn-eng btn-eng-secondary">System Specs</a>
+            <h1 style="background: linear-gradient(135deg, #020617 0%, #6366f1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Marketing de Elite, <br>em Piloto Automático.</h1>
+            <p>O MKTPilot Pro é a infraestrutura definitiva de IA para agências e marcas que exigem escala industrial, precisão técnica e resultados inquestionáveis.</p>
+            <div style="display: flex; gap: 16px; justify-content: center;">
+                <a href="/register" class="btn-cta btn-primary">Iniciar Demonstração</a>
+                <a href="#solucao" class="btn-cta btn-secondary">Conhecer a Engenharia</a>
+            </div>
+
+            <div class="hero-visual">
+                <img src="/static/images/mktpilot_pro_dashboard_hero.png" alt="MKTPilot Pro Intelligence Dashboard">
             </div>
         </div>
     </section>
 
-    <!-- Main Grid System -->
-    <section id="infra" class="container">
-        <div class="main-grid">
-            
-            <!-- AURA: Large Split Card -->
-            <div class="grid-card card-large">
-                <span class="mono-label">Core Engine</span>
-                <h3>Aura Orchestrator</h3>
-                <div class="card-content-split">
-                    <div style="flex: 1;">
-                        <p style="font-size: 1rem;">Nossa IA orquestradora analisa o mercado em tempo real para gerar campanhas de alta conversão.</p>
-                        <ul style="list-style:none; margin-top:16px; font-size:0.8rem; color:var(--lp-muted);">
-                            <li style="margin-bottom:8px;">✅ Cross-Platform Logic</li>
-                            <li style="margin-bottom:8px;">✅ Dynamic Creative Optimization</li>
-                            <li>✅ Real-time Market Fit</li>
-                        </ul>
+    <!-- Storytelling Section 1: Aura -->
+    <section class="feature-section" id="solucao">
+        <div class="container feature-grid">
+            <div class="feature-content">
+                <span class="f-tag">Orquestração Central</span>
+                <h2 class="f-title">O Cérebro Aura IA.</h2>
+                <p class="f-desc">Diferente de ferramentas isoladas, nossa IA orquestradora analisa seu nicho, estuda a concorrência e define a arquitetura de canais ideal para o seu produto. Uma estratégia mestre, executada em segundos.</p>
+                <div style="display: flex; gap: 24px;">
+                    <div>
+                        <strong style="display:block; font-size: 1.5rem; color: var(--accent);">92%</strong>
+                        <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase;">Automação</span>
                     </div>
-                    <div class="terminal-ui">
-                        > init_aura_agent... [OK] <br>
-                        > data_ingestion: competitor_analysis <br>
-                        > build_strategy: optimized_conversion <br>
-                        > status: monitoring_performance
+                    <div style="border-left: 1px solid var(--border); padding-left: 24px;">
+                        <strong style="display:block; font-size: 1.5rem; color: var(--accent);">3.5x</strong>
+                        <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase;">Média de ROAS</span>
                     </div>
                 </div>
             </div>
-
-            <!-- VIDEO: Sidebar Card -->
-            <div class="grid-card card-sidebar">
-                <span class="mono-label">Creative</span>
-                <h3>Video Forge</h3>
-                <p>Gere vídeos virais de alta fidelidade para TikTok e Meta em segundos.</p>
-                <div style="margin-top:auto; height:4px; width:100%; background:var(--lp-border); border-radius:2px;">
-                    <div style="width:75%; height:100%; background:var(--lp-accent);"></div>
-                </div>
+            <div class="f-image">
+                <!-- Visual representativo de inteligência -->
+                <div style="font-size: 8rem; filter: drop-shadow(0 20px 40px rgba(99,102,241,0.2));">🧠</div>
             </div>
-
-            <!-- HUNTER: Sidebar Card -->
-            <div class="grid-card card-sidebar">
-                <span class="mono-label">Prospecting</span>
-                <h3>Lead Hunter</h3>
-                <p>Scraping profundo com análise de vulnerabilidade e scripts magnéticos.</p>
-            </div>
-
-            <!-- ROW 2: Balanced 3-column -->
-            <div class="grid-card card-third">
-                <span class="mono-label">Automation</span>
-                <h3>Autopilot 24/7</h3>
-                <p>Otimização de campanhas em background enquanto você dorme.</p>
-            </div>
-
-            <div class="grid-card card-third">
-                <span class="mono-label">Intelligence</span>
-                <h3>Competitor Watch</h3>
-                <p>Radar de mudanças em tempo real nos sites dos concorrentes.</p>
-            </div>
-
-            <div class="grid-card card-third">
-                <span class="mono-label">Monitoring</span>
-                <h3>Eva Brain</h3>
-                <p>Diagnósticos preditivos que detectam quedas de performance.</p>
-            </div>
-
-            <!-- ROW 3: Final Dual -->
-            <div class="grid-card" style="grid-column: span 1.5;">
-                <span class="mono-label">Visibility</span>
-                <h3>SEO AI Engine</h3>
-                <p>Otimização técnica focada em agentes de busca de IA (Perplexity/Claude).</p>
-            </div>
-
-            <div class="grid-card" style="grid-column: span 1.5;">
-                <span class="mono-label">Collaborative</span>
-                <h3>Marketplace</h3>
-                <p>Acesse arquiteturas de campanhas vencedoras validadas pela comunidade.</p>
-            </div>
-
         </div>
     </section>
 
-    <section class="container" style="margin-bottom: 100px;">
-        <div class="cta-final">
-            <h2>Pronto para escalar?</h2>
-            <p>Entre para a rede de elite que opera com MKTPilot Pro.</p>
-            <a href="/register" class="btn-eng btn-eng-primary" style="background:#fff; color:#000;">Create Pro Account</a>
+    <!-- Storytelling Section 2: Lead Hunter -->
+    <section class="feature-section">
+        <div class="container feature-grid">
+            <div class="feature-content">
+                <span class="f-tag">Inteligência Comercial</span>
+                <h2 class="f-title">Lead Hunter Enriched.</h2>
+                <p class="f-desc">Não apenas encontre contatos, domine-os. Nossa IA mapeia a presença digital dos seus prospects, identifica falhas críticas e gera abordagens personalizadas que são impossíveis de ignorar.</p>
+                <a href="/register" class="btn-cta btn-secondary">Explorar Hunter</a>
+            </div>
+            <div class="f-image">
+                <div style="font-size: 8rem; filter: drop-shadow(0 20px 40px rgba(99,102,241,0.2));">🏹</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bento Secondary Features -->
+    <section class="bento-section" id="funcionalidades">
+        <div class="container">
+            <div style="text-align: center; margin-bottom: 80px;">
+                <span class="f-tag">Ecossistema Pro</span>
+                <h2 style="font-size: 3rem;">Infraestrutura 360.</h2>
+            </div>
+            <div class="bento-grid">
+                <div class="bento-card">
+                    <h3>Video Forge</h3>
+                    <p>Criação de criativos cinematográficos para TikTok e Meta Ads com modelos de vídeo de última geração.</p>
+                </div>
+                <div class="bento-card">
+                    <h3>Eva Brain</h3>
+                    <p>Monitoramento preditivo de performance que detecta anomalias no ROI antes que elas aconteçam.</p>
+                </div>
+                <div class="bento-card">
+                    <h3>SEO Engine</h3>
+                    <p>Otimização técnica focada na visibilidade em buscadores de IA como Perplexity e Claude.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section style="padding: 120px 0; text-align: center; background: radial-gradient(circle at bottom, #f5f3ff 0%, #ffffff 70%);">
+        <div class="container">
+            <h2 style="font-size: 4.5rem; margin-bottom: 32px;">Domine seu mercado.</h2>
+            <p style="font-size: 1.25rem; color: var(--muted); margin-bottom: 48px;">O MKTPilot Pro é a escolha de agências que operam em alto nível.</p>
+            <a href="/register" class="btn-cta btn-primary" style="font-size: 1.25rem; padding: 24px 64px;">Começar Agora</a>
         </div>
     </section>
 
     <footer>
-        <p style="font-size: 0.8rem; color: var(--lp-muted);">MKTPilot Pro &copy; 2026. Marketing Engineering Infrastructure.</p>
+        <div class="logo" style="justify-content: center; margin-bottom: 24px;">
+            <div class="logo-icon"></div>
+            <span>MKTPilot Pro</span>
+        </div>
+        <p style="color: var(--muted); font-size: 0.9rem;">&copy; 2026 MKTPilot Architecture. Built for the Elite.</p>
     </footer>
 
 </body>
