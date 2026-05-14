@@ -93,10 +93,14 @@ def gerar_imagem_siliconflow(prompt_texto, produto, tentativas=2):
         try:
             response = requests.post(f"{SILICONFLOW_BASE_URL}/images/generations", headers=headers, json=payload, timeout=30)
             if response.status_code == 200:
-                image_url = response.json()['data'][0]['url']
-                CACHE_IMAGE_URLS[cache_key] = image_url
-                print(f"✅ SiliconFlow SUCESSO: {image_url}", flush=True)
-                return image_url
+                res_json = response.json()
+                if res_json and 'data' in res_json and len(res_json['data']) > 0:
+                    image_url = res_json['data'][0].get('url')
+                    if image_url:
+                        CACHE_IMAGE_URLS[cache_key] = image_url
+                        print(f"✅ SiliconFlow SUCESSO: {image_url}", flush=True)
+                        return image_url
+                print(f"⚠️ SiliconFlow retornou JSON inesperado: {res_json}", flush=True)
             else:
                 print(f"❌ SiliconFlow Erro ({response.status_code}): {response.text}", flush=True)
         except Exception as e:
@@ -710,7 +714,9 @@ RETORNE APENAS O JSON seguindo rigorosamente esta estrutura:
             "result_text": json.dumps(campaign_data, ensure_ascii=False)
         }).execute()
         
-        camp_id = insert_res.data[0].get('id') if insert_res.data else None
+        camp_id = None
+        if insert_res and hasattr(insert_res, 'data') and insert_res.data and len(insert_res.data) > 0:
+            camp_id = insert_res.data[0].get('id')
         
         # Concluir Job
         update_job(status="completed", progress=100, step="Concluído!", result={"campaign_id": camp_id, "data": campaign_data})
