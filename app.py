@@ -15,6 +15,8 @@ from supabase import create_client, Client
 from datetime import datetime, timedelta
 import threading
 import uuid
+import re
+import random
 
 # load_dotenv removido daqui
 app = Flask(__name__)
