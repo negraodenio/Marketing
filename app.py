@@ -7,20 +7,66 @@ from routes.seo_engine import seo_bp
 import requests
 import json
 import asyncio
+import ipaddress
+import socket
 from bs4 import BeautifulSoup
 import edge_tts
 from flask import Flask, request, jsonify, render_template, redirect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 import threading
 import uuid
 import re
 import random
+import hashlib
+import logging
+import importlib.util
+from pathlib import Path
+from urllib.parse import urlparse
+from contextvars import ContextVar
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 # load_dotenv removido daqui
 app = Flask(__name__)
 app.register_blueprint(modules_bp)
 app.register_blueprint(seo_bp)
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY") or os.getenv("SUPABASE_SECRET_ROLE") or "change-this-secret-in-production"
+
+def _rate_limit_key():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        return "token:" + hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+    return get_remote_address()
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    app=app,
+    default_limits=["300 per hour", "60 per minute"],
+)
+
+logger = logging.getLogger("mktpilot")
+
+def _load_pipeline_v2():
+    """Carrega pipeline_v2 via path para evitar conflitos com app.py."""
+    try:
+        module_path = Path(__file__).resolve().parent / "app" / "services" / "pipeline_v2.py"
+        if not module_path.exists():
+            return None
+        spec = importlib.util.spec_from_file_location("pipeline_v2_module", str(module_path))
+        if not spec or not spec.loader:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except Exception as e:
+        logger.warning("Falha ao carregar pipeline_v2: %s", e)
+        return None
+
+PIPELINE_V2 = _load_pipeline_v2()
+PIPELINE_V2_ENABLED = os.getenv("ENABLE_PIPELINE_V2", "true").lower() == "true"
 
 # ==========================================
 # CONFIGURAÇÕES E SUPABASE
@@ -30,7 +76,15 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_anon_key") # Ace
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL") or "meta-llama/llama-3-70b-instruct"
 OPENROUTER_ANALYSIS_MODEL = os.getenv("OPENROUTER_ANALYSIS_MODEL", "minimax/minimax-01")
-DEMO_LOGIN_ENABLED = os.getenv("DEMO_LOGIN_ENABLED", "false").lower() == "true"
+BACKGROUND_THREADS_ENABLED = os.getenv("ENABLE_BACKGROUND_THREADS", "false").lower() == "true" and not os.getenv("VERCEL")
+AUTOPILOT_WORKER_ENABLED = os.getenv("ENABLE_AUTOPILOT_WORKER", "false").lower() == "true" and not os.getenv("VERCEL")
+OAUTH_STATE_TTL_SECONDS = int(os.getenv("OAUTH_STATE_TTL_SECONDS", "600"))
+
+# Guard rails de custo (daily)
+DAILY_MAX_IA_CALLS = int(os.getenv("DAILY_MAX_IA_CALLS", "150"))
+DAILY_MAX_IMAGE_GENS = int(os.getenv("DAILY_MAX_IMAGE_GENS", "20"))
+DAILY_MAX_VIDEO_GENS = int(os.getenv("DAILY_MAX_VIDEO_GENS", "5"))
+DAILY_MAX_ESTIMATED_COST_USD = float(os.getenv("DAILY_MAX_ESTIMATED_COST_USD", "3.0"))
 
 # Configurações Meta Ads
 META_APP_ID = os.getenv("META_APP_ID")
@@ -58,8 +112,11 @@ SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 
 MAX_IMAGES = 3
 CACHE_IMAGE_URLS = {}
+_oauth_state_serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="mktpilot-oauth-state-v1")
 
-import hashlib
+_cost_guard_user_id = ContextVar("cost_guard_user_id", default=None)
+_cost_guard_db = ContextVar("cost_guard_db", default=None)
+
 import time
 import requests
 
@@ -68,6 +125,127 @@ def sanitize_input(text):
     if not text: return ""
     clean = str(text).replace("ignore all previous", "[REDACTED]").replace("system prompt", "[REDACTED]")
     return clean[:1000]
+
+def get_json_payload(required_fields=None):
+    dados = request.get_json(silent=True)
+    if not isinstance(dados, dict):
+        return None, (jsonify({"erro": "Payload JSON inválido"}), 400)
+    if required_fields:
+        missing = [f for f in required_fields if not dados.get(f)]
+        if missing:
+            return None, (jsonify({"erro": f"Campos obrigatórios ausentes: {', '.join(missing)}"}), 400)
+    return dados, None
+
+def validate_public_http_url(url):
+    if not url:
+        raise ValueError("URL vazia")
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("URL deve usar http/https")
+    if not parsed.hostname:
+        raise ValueError("Hostname inválido")
+
+    blocked_networks = [
+        ipaddress.ip_network("127.0.0.0/8"),
+        ipaddress.ip_network("10.0.0.0/8"),
+        ipaddress.ip_network("172.16.0.0/12"),
+        ipaddress.ip_network("192.168.0.0/16"),
+        ipaddress.ip_network("169.254.0.0/16"),
+        ipaddress.ip_network("::1/128"),
+        ipaddress.ip_network("fc00::/7"),
+        ipaddress.ip_network("fe80::/10"),
+    ]
+
+    try:
+        resolved = socket.getaddrinfo(parsed.hostname, parsed.port or 80, proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        raise ValueError("Falha ao resolver DNS da URL")
+
+    for item in resolved:
+        ip = ipaddress.ip_address(item[4][0])
+        for blocked in blocked_networks:
+            if ip in blocked:
+                raise ValueError("URL resolve para IP privado/reservado")
+
+def build_oauth_state(user_id, provider):
+    payload = {
+        "u": str(user_id),
+        "p": provider,
+        "n": uuid.uuid4().hex,
+    }
+    return _oauth_state_serializer.dumps(payload)
+
+def parse_oauth_state(state, expected_provider):
+    if not state:
+        return None
+    try:
+        payload = _oauth_state_serializer.loads(state, max_age=OAUTH_STATE_TTL_SECONDS)
+        if payload.get("p") != expected_provider:
+            return None
+        return payload
+    except (BadSignature, SignatureExpired):
+        return None
+
+def _estimate_event_cost(kind):
+    costs = {
+        "ia_call": 0.002,
+        "image_gen": 0.010,
+        "video_gen": 0.100,
+    }
+    return costs.get(kind, 0.0)
+
+def _check_and_consume_cost_guard(kind="ia_call"):
+    user_id = _cost_guard_user_id.get()
+    db = _cost_guard_db.get()
+    if not user_id or not db:
+        return True, None
+
+    usage_date = datetime.utcnow().date().isoformat()
+    try:
+        res = db.table("ai_usage_daily").select("*").eq("user_id", str(user_id)).eq("usage_date", usage_date).limit(1).execute()
+    except Exception as e:
+        msg = str(e).lower()
+        if "ai_usage_daily" in msg or "relation" in msg or "does not exist" in msg:
+            # Compatibilidade: se migração ainda não foi aplicada, não derruba a produção
+            return True, None
+        return False, "Falha ao validar limites de uso"
+
+    row = res.data[0] if res and getattr(res, "data", None) else {}
+    ia_calls = int(row.get("ia_calls", 0))
+    image_gens = int(row.get("image_gens", 0))
+    video_gens = int(row.get("video_gens", 0))
+    estimated_cost = float(row.get("estimated_cost_usd", 0) or 0)
+
+    if kind == "ia_call" and ia_calls >= DAILY_MAX_IA_CALLS:
+        return False, "Limite diário de chamadas IA atingido"
+    if kind == "image_gen" and image_gens >= DAILY_MAX_IMAGE_GENS:
+        return False, "Limite diário de geração de imagem atingido"
+    if kind == "video_gen" and video_gens >= DAILY_MAX_VIDEO_GENS:
+        return False, "Limite diário de geração de vídeo atingido"
+
+    next_cost = estimated_cost + _estimate_event_cost(kind)
+    if next_cost > DAILY_MAX_ESTIMATED_COST_USD:
+        return False, "Limite diário de custo estimado atingido"
+
+    payload = {
+        "user_id": str(user_id),
+        "usage_date": usage_date,
+        "ia_calls": ia_calls + (1 if kind == "ia_call" else 0),
+        "image_gens": image_gens + (1 if kind == "image_gen" else 0),
+        "video_gens": video_gens + (1 if kind == "video_gen" else 0),
+        "estimated_cost_usd": round(next_cost, 4),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    try:
+        db.table("ai_usage_daily").upsert(payload, on_conflict="user_id,usage_date").execute()
+    except Exception as e:
+        msg = str(e).lower()
+        if "ai_usage_daily" in msg or "relation" in msg or "does not exist" in msg:
+            return True, None
+        return False, "Falha ao registrar consumo"
+
+    return True, None
 
 def gerar_imagem_siliconflow(prompt_texto, produto, tentativas=2):
     if not SILICONFLOW_API_KEY: return None
@@ -129,6 +307,11 @@ def placeholder_image(texto=""):
     return f"https://placehold.co/1024x1024/2c3e50/ffffff?text={texto.replace(' ', '+')[:20]}"
 
 def gerar_imagem_com_fallback(prompt_texto, produto):
+    ok, reason = _check_and_consume_cost_guard("image_gen")
+    if not ok:
+        print(f"⚠️ Geração de imagem bloqueada por custo: {reason}", flush=True)
+        return placeholder_image("Limite de Uso")
+
     # 1. Tenta SiliconFlow
     url = gerar_imagem_siliconflow(prompt_texto, produto)
     if url: return url
@@ -148,9 +331,14 @@ def scrape_concorrente(url):
     if not url or not url.startswith('http'):
         return ""
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        validate_public_http_url(url)
+        headers = {'User-Agent': 'MKTPilotBot/1.0'}
+        response = requests.get(url, headers=headers, timeout=8, allow_redirects=False, stream=True)
+        content_type = response.headers.get("Content-Type", "")
+        if "text/html" not in content_type.lower():
+            return ""
+        raw = response.raw.read(5_000_000, decode_content=True)
+        soup = BeautifulSoup(raw, 'html.parser')
         for script in soup(["script", "style"]):
             script.extract()
         texto = soup.get_text(separator=' ', strip=True)
@@ -404,6 +592,11 @@ def gerar_video_siliconflow(roteiro_completo, produto, plataforma="Multicanal"):
 
 def gerar_video_com_fallback(roteiro_completo, produto, plataforma="Multicanal"):
     """Prioriza Replicate e usa SiliconFlow como fallback"""
+    ok, reason = _check_and_consume_cost_guard("video_gen")
+    if not ok:
+        print(f"⚠️ Geração de vídeo bloqueada por custo: {reason}", flush=True)
+        return None
+
     # 1. Tenta Replicate
     url = gerar_video_replicate(roteiro_completo, produto, plataforma)
     if url: return url
@@ -483,6 +676,10 @@ def chamar_ia(prompt, system_message="Você é um assistente de marketing especi
     """
     if not OPENROUTER_API_KEY:
         return f"[Simulação IA]: {prompt[:40]}..."
+
+    ok, reason = _check_and_consume_cost_guard("ia_call")
+    if not ok:
+        return f"Erro de limite: {reason}"
 
     modelos = [modelo_forcado] if modelo_forcado else [
         OPENROUTER_MODEL, 
@@ -594,8 +791,10 @@ def index():
     return render_template('index.html')
 
 @app.route('/api/auth/register', methods=['POST'])
+@limiter.limit("12 per minute")
 def register():
-    dados = request.json
+    dados, err = get_json_payload(required_fields=["email", "password"])
+    if err: return err
     email = dados.get("email")
     senha = dados.get("password")
     if not supabase: return jsonify({"erro": "Supabase não configurado no servidor."}), 500
@@ -609,14 +808,12 @@ def register():
         return jsonify({"erro": str(e)}), 400
 
 @app.route('/api/auth/login', methods=['POST'])
+@limiter.limit("12 per minute")
 def login():
-    dados = request.json
+    dados, err = get_json_payload(required_fields=["email", "password"])
+    if err: return err
     email = dados.get("email")
     senha = dados.get("password")
-    
-    # BYPASS PARA TESTE ELITE (Modo Demo)
-    if DEMO_LOGIN_ENABLED and email == "demo@mktpilot.io":
-        return jsonify({"user": "demo@mktpilot.io", "token": "demo-token-elite-2025"}), 200
 
     if not supabase: return jsonify({"erro": "Supabase não configurado."}), 500
 
@@ -648,6 +845,9 @@ def process_campaign_job(job_id, user_id, dados):
         if error: update_data["error"] = error
         db.table("background_jobs").update(update_data).eq("id", job_id).execute()
 
+    ctx_user = _cost_guard_user_id.set(str(user_id))
+    ctx_db = _cost_guard_db.set(db)
+
     try:
         update_job(status="processing", progress=5, step="Analisando mercado e gerando copy...")
         
@@ -669,27 +869,65 @@ def process_campaign_job(job_id, user_id, dados):
             if texto_concorrente:
                 contexto_spy = f"\n\nATENÇÃO (Análise de Concorrência):\nSite do concorrente: \"{texto_concorrente[:1500]}\""
 
-        # 2. Geração de Copy (IA) - SCHEMA ENFORCEMENT
-        schema = {
-            "facebook_ad": {
-                "headline_a": "...", "headline_b": "...", "headline_c": "...",
-                "primary_text_a": "...", "primary_text_b": "...", "primary_text_c": "...",
-                "cta": "Saiba Mais"
-            },
-            "instagram_posts": [
-                {"caption": "...", "hashtags": "#..."},
-                {"caption": "...", "hashtags": "#..."}
-            ],
-            "email": {
-                "subject_a": "...", "subject_b": "...",
-                "body_a": "...", "body_b": "..."
-            },
-            "video_script": {
-                "hook": "...", "body": "...", "cta": "..."
-            }
-        }
+        # 2. Geração de Copy (IA) - PIPELINE V2 (Stages 1-4)
+        update_job(progress=25, step="Analisando mercado e ICP...")
 
-        prompt = f"""Crie uma campanha de marketing completa para "{produto}".
+        def usage_hook(stage_name, usage, estimated_cost):
+            try:
+                logger.info(
+                    "pipeline_v2 usage stage=%s prompt_tokens=%s completion_tokens=%s est_cost=%.6f",
+                    stage_name,
+                    usage.get("prompt_tokens", 0),
+                    usage.get("completion_tokens", 0),
+                    estimated_cost,
+                )
+            except Exception:
+                pass
+
+        campaign_data = None
+        if PIPELINE_V2_ENABLED and PIPELINE_V2 and hasattr(PIPELINE_V2, "run_pipeline_v2"):
+            try:
+                pipeline_result = PIPELINE_V2.run_pipeline_v2(
+                    product=produto,
+                    niche=nicho,
+                    goal=objetivo,
+                    audience=publico_alvo,
+                    tone=tom_de_voz,
+                    competitor_context=contexto_spy,
+                    usage_hook=usage_hook,
+                )
+                campaign_data = pipeline_result.campaign_payload.model_dump()
+                campaign_data["strategy_insights"] = {
+                    "market_analysis": pipeline_result.market_analysis.model_dump(),
+                    "icp_mapping": pipeline_result.icp_mapping.model_dump(),
+                    "creative_strategy": pipeline_result.creative_strategy.model_dump(),
+                    "stage_meta": [s.model_dump() for s in pipeline_result.stages],
+                }
+                campaign_data["hooks_lab"] = pipeline_result.hook_generation.model_dump()
+            except Exception as pipeline_error:
+                print(f"⚠️ Pipeline V2 falhou, usando fallback legado: {pipeline_error}", flush=True)
+
+        # Fallback legado para continuidade de negócio
+        if not campaign_data:
+            schema = {
+                "facebook_ad": {
+                    "headline_a": "...", "headline_b": "...", "headline_c": "...",
+                    "primary_text_a": "...", "primary_text_b": "...", "primary_text_c": "...",
+                    "cta": "Saiba Mais"
+                },
+                "instagram_posts": [
+                    {"caption": "...", "hashtags": "#..."},
+                    {"caption": "...", "hashtags": "#..."}
+                ],
+                "email": {
+                    "subject_a": "...", "subject_b": "...",
+                    "body_a": "...", "body_b": "..."
+                },
+                "video_script": {
+                    "hook": "...", "body": "...", "cta": "..."
+                }
+            }
+            prompt = f"""Crie uma campanha de marketing completa para "{produto}".
 Nicho: {nicho}. Objetivo: {objetivo}.{contexto_spy}
 Público: {publico_alvo}. Tom: {tom_de_voz}.
 
@@ -700,31 +938,18 @@ REGRAS:
 
 RETORNE APENAS JSON:
 {json.dumps(schema, indent=2)}"""
-        
-        system_msg = "Você é o motor de IA do MKTPilot Pro. Sua saída é puramente JSON técnico de marketing. Sem conversas."
-        resposta_bruta = chamar_ia(prompt, system_message=system_msg)
-        
-        def safe_json_extract(texto):
-            if not texto: return None
-            # Limpeza profunda
-            t = texto.strip()
+            system_msg = "Você é o motor de IA do MKTPilot Pro. Sua saída é puramente JSON técnico de marketing. Sem conversas."
+            resposta_bruta = chamar_ia(prompt, system_message=system_msg)
+            t = (resposta_bruta or "").strip()
             t = re.sub(r'```json\s*', '', t)
             t = re.sub(r'```\s*', '', t)
-            try:
-                start, end = t.find('{'), t.rfind('}') + 1
-                if start == -1 or end <= start: return None
-                js = t[start:end]
-                js = re.sub(r',\s*([\]}])', r'\1', js) # Fix trailing commas
-                return json.loads(js)
-            except: return None
+            start, end = t.find('{'), t.rfind('}') + 1
+            if start == -1 or end <= start:
+                raise Exception("Falha de parse na geração legada")
+            js = re.sub(r',\s*([\]}])', r'\1', t[start:end])
+            campaign_data = json.loads(js)
 
-        campaign_data = safe_json_extract(resposta_bruta)
-        if not campaign_data:
-            print(f"❌ Falha de Formato IA. Conteúdo:\n{resposta_bruta}", flush=True)
-            raise Exception("A IA se confundiu na estrutura. Por favor, tente gerar novamente.")
-
-        update_job(progress=40, step="Polindo textos e preparando criativos...")
-        campaign_data = revisar_campanha_completa(campaign_data)
+        update_job(progress=40, step="Planejamento criativo validado. Preparando criativos...")
 
         # 3. Geração de Imagens
         if "instagram_posts" in campaign_data:
@@ -769,16 +994,21 @@ RETORNE APENAS JSON:
     except Exception as e:
         print(f"❌ Erro no Job {job_id}: {e}", flush=True)
         update_job(status="failed", error=str(e), step="Erro no processamento")
+    finally:
+        _cost_guard_user_id.reset(ctx_user)
+        _cost_guard_db.reset(ctx_db)
 
 # ==========================================
 # ROTAS DO SAAS (Protegidas)
 # ==========================================
 @app.route('/api/copilot/gerar', methods=['POST'])
+@limiter.limit("6 per hour; 2 per minute")
 def api_copilot_gerar():
     user = get_user_from_request(request)
     if not user: return jsonify({"erro": "Não autorizado"}), 401
 
-    dados = request.json or {}
+    dados, err = get_json_payload()
+    if err: return err
     
     # 1. Cria o registro do Job no banco
     try:
@@ -795,11 +1025,14 @@ def api_copilot_gerar():
             
         job_id = job_res.data[0]['id']
         
-        # 2. Dispara a thread em background
-        thread = threading.Thread(target=process_campaign_job, args=(job_id, user.id, dados))
-        thread.start()
+        # 2. Processamento seguro (thread opcional; fallback síncrono)
+        if BACKGROUND_THREADS_ENABLED:
+            thread = threading.Thread(target=process_campaign_job, args=(job_id, user.id, dados), daemon=True)
+            thread.start()
+        else:
+            process_campaign_job(job_id, user.id, dados)
         
-        return jsonify({"job_id": job_id, "mensagem": "Tarefa iniciada em background"}), 202
+        return jsonify({"job_id": job_id, "mensagem": "Tarefa iniciada"}), 202
         
     except Exception as e:
         return jsonify({"erro": f"Erro ao iniciar processamento: {str(e)}"}), 500
@@ -843,11 +1076,13 @@ def api_copilot_jobs_list():
         return jsonify({"erro": str(e)}), 500
 
 @app.route('/api/campaigns/update', methods=['POST'])
+@limiter.limit("60 per hour")
 def api_campaigns_update():
     user = get_user_from_request(request)
     if not user: return jsonify({"erro": "Não autorizado"}), 401
     
-    dados = request.json or {}
+    dados, err = get_json_payload(required_fields=["id", "result_text"])
+    if err: return err
     campanha_id = dados.get('id')
     novos_dados = dados.get('result_text') # Objeto JSON completo
     
@@ -876,11 +1111,13 @@ def api_campanhas_historico():
         return jsonify({"erro": "Falha ao buscar campanhas"}), 500
 
 @app.route('/api/campanhas/otimizar', methods=['POST'])
+@limiter.limit("20 per hour")
 def api_campanhas_otimizar():
     user = get_user_from_request(request)
     if not user: return jsonify({"erro": "Não autorizado"}), 401
 
-    dados = request.json or {}
+    dados, err = get_json_payload()
+    if err: return err
     relatorio_manual = dados.get('relatorio', '')
     auto_mode = dados.get('auto', False)
     
@@ -938,14 +1175,35 @@ Faça uma análise profunda e acionável. Seja específico nas recomendações."
 # ROTAS META ADS (AUTH & PUBLISH) — MULTIUSUÁRIO
 # =====================================================
 
+@app.route('/api/oauth/meta/url', methods=['GET'])
+@limiter.limit("30 per hour")
+def api_oauth_meta_url():
+    user = get_user_from_request(request)
+    if not user:
+        return jsonify({"erro": "Não autorizado"}), 401
+    if not META_APP_ID:
+        return jsonify({"erro": "META_APP_ID não configurado"}), 400
+
+    scope = "ads_management,ads_read,business_management,pages_manage_posts,pages_read_engagement"
+    state = build_oauth_state(user.id, "meta")
+    auth_url = f"https://www.facebook.com/v18.0/dialog/oauth?client_id={META_APP_ID}&redirect_uri={META_REDIRECT_URI}&scope={scope}&state={state}"
+    return jsonify({"auth_url": auth_url}), 200
+
 @app.route('/auth/meta/login')
 def meta_login():
     if not META_APP_ID: return "META_APP_ID não configurado no .env", 400
     scope = "ads_management,ads_read,business_management,pages_manage_posts,pages_read_engagement"
-    # Pega o token do usuário via query string para identificá-lo na callback
-    user_token = request.args.get('token', '')
-    import urllib.parse
-    state = urllib.parse.quote(user_token)
+
+    # Compatibilidade: aceita token query legado, mas nunca repassa JWT em state
+    user = get_user_from_request(request)
+    if not user:
+        user_token = request.args.get('token', '')
+        if user_token:
+            user = get_user_from_token(user_token)
+    if not user:
+        return "Não autenticado", 401
+
+    state = build_oauth_state(user.id, "meta")
     url = f"https://www.facebook.com/v18.0/dialog/oauth?client_id={META_APP_ID}&redirect_uri={META_REDIRECT_URI}&scope={scope}&state={state}"
     return redirect(url)
 
@@ -970,12 +1228,9 @@ def meta_callback():
     accounts_data = accounts_resp.json().get('data', [])
     ad_account_id = accounts_data[0]['id'] if accounts_data else None
     
-    # Identificar o usuário via state parameter
-    state_token = request.args.get('state', '')
-    import urllib.parse
-    state_token = urllib.parse.unquote(state_token)
-    user = get_user_from_token(state_token)
-    user_id = user.id if user else None
+    # Identificar o usuário via state assinado
+    state_payload = parse_oauth_state(request.args.get('state', ''), "meta")
+    user_id = state_payload.get("u") if state_payload else None
     
     # Salvar token no banco (por usuário)
     try:
@@ -1000,6 +1255,7 @@ def meta_callback():
     </body></html>"""
 
 @app.route('/api/campaigns/publish_to_meta', methods=['POST'])
+@limiter.limit("20 per hour")
 def api_publish_to_meta():
     user = get_user_from_request(request)
     if not user: return jsonify({"erro": "Não autorizado"}), 401
@@ -1015,7 +1271,8 @@ def api_publish_to_meta():
         ad_account = res.data['ad_account_id']
         
         # Dados da campanha
-        dados = request.json or {}
+        dados, err = get_json_payload()
+        if err: return err
         campaign_name = dados.get('campaign_name', 'Campanha Copilot IA')
         
         # Criar campanha no Meta
@@ -1042,12 +1299,36 @@ def api_publish_to_meta():
 # ROTAS TIKTOK ADS (AUTH & PUBLISH) — MULTIUSUÁRIO
 # =====================================================
 
+@app.route('/api/oauth/tiktok/url', methods=['GET'])
+@limiter.limit("30 per hour")
+def api_oauth_tiktok_url():
+    user = get_user_from_request(request)
+    if not user:
+        return jsonify({"erro": "Não autorizado"}), 401
+    if not TIKTOK_APP_ID:
+        return jsonify({"erro": "TIKTOK_APP_ID não configurado"}), 400
+
+    state = build_oauth_state(user.id, "tiktok")
+    auth_url = (
+        f"https://business-api.tiktok.com/portal/auth?"
+        f"app_id={TIKTOK_APP_ID}"
+        f"&redirect_uri={TIKTOK_REDIRECT_URI}"
+        f"&state={state}"
+    )
+    return jsonify({"auth_url": auth_url}), 200
+
 @app.route('/auth/tiktok/login')
 def tiktok_login():
     if not TIKTOK_APP_ID: return "TIKTOK_APP_ID não configurado no .env", 400
-    user_token = request.args.get('token', '')
-    import urllib.parse
-    state = urllib.parse.quote(user_token)
+    user = get_user_from_request(request)
+    if not user:
+        user_token = request.args.get('token', '')
+        if user_token:
+            user = get_user_from_token(user_token)
+    if not user:
+        return "Não autenticado", 401
+
+    state = build_oauth_state(user.id, "tiktok")
     url = (
         f"https://business-api.tiktok.com/portal/auth?"
         f"app_id={TIKTOK_APP_ID}"
@@ -1081,12 +1362,9 @@ def tiktok_callback():
     advertiser_ids = data.get('advertiser_ids', [])
     advertiser_id = str(advertiser_ids[0]) if advertiser_ids else None
     
-    # Identificar o usuário via state parameter
-    state_token = request.args.get('state', '')
-    import urllib.parse
-    state_token = urllib.parse.unquote(state_token)
-    user = get_user_from_token(state_token)
-    user_id = user.id if user else None
+    # Identificar o usuário via state assinado
+    state_payload = parse_oauth_state(request.args.get('state', ''), "tiktok")
+    user_id = state_payload.get("u") if state_payload else None
     
     # Salvar token no banco
     try:
@@ -1136,6 +1414,7 @@ def api_meta_status():
     return jsonify({"connected": False}), 200
 
 @app.route('/api/campaigns/publish_to_tiktok', methods=['POST'])
+@limiter.limit("20 per hour")
 def api_publish_to_tiktok():
     user = get_user_from_request(request)
     if not user: return jsonify({"erro": "Não autorizado"}), 401
@@ -1149,7 +1428,8 @@ def api_publish_to_tiktok():
         
         token = res.data['access_token']
         advertiser_id = res.data['advertiser_id']
-        dados = request.json or {}
+        dados, err = get_json_payload()
+        if err: return err
         video_url = dados.get('video_url', '')
         headline = dados.get('headline', 'Campanha Copilot IA')
         
@@ -1196,11 +1476,13 @@ def api_publish_to_tiktok():
     except Exception as e:
         return jsonify({"erro": f"Erro TikTok: {str(e)}"}), 500
 @app.route('/api/leads/buscar', methods=['POST'])
+@limiter.limit("10 per hour")
 def api_leads_buscar():
     user = get_user_from_request(request)
     if not user: return jsonify({"erro": "Não autorizado"}), 401
     
-    dados = request.json or {}
+    dados, err = get_json_payload(required_fields=["nicho", "cidade"])
+    if err: return err
     nicho = sanitize_input(dados.get('nicho'))
     cidade = sanitize_input(dados.get('cidade'))
     
@@ -1212,11 +1494,13 @@ def api_leads_buscar():
     return jsonify({"leads": leads}), 200
 
 @app.route('/api/leads/pitch', methods=['POST'])
+@limiter.limit("20 per hour")
 def api_leads_pitch():
     user = get_user_from_request(request)
     if not user: return jsonify({"erro": "Não autorizado"}), 401
     
-    dados = request.json or {}
+    dados, err = get_json_payload(required_fields=["nome"])
+    if err: return err
     lead_nome = dados.get('nome')
     lead_site = dados.get('site')
     meu_produto = dados.get('meu_produto', 'Marketing Digital')
@@ -1430,13 +1714,20 @@ def api_hooks_list():
     return jsonify({"hooks": hooks}), 200
 
 @app.route('/api/funnel/clone', methods=['POST'])
+@limiter.limit("8 per hour")
 def api_funnel_clone():
     user = get_user_from_request(request)
     if not user: return jsonify({"erro": "Não autorizado"}), 401
     
-    dados = request.json or {}
+    dados, err = get_json_payload(required_fields=["url"])
+    if err: return err
     url = dados.get('url')
     if not url: return jsonify({"erro": "URL obrigatória"}), 400
+
+    try:
+        validate_public_http_url(url)
+    except Exception:
+        return jsonify({"erro": "URL inválida para análise"}), 400
     
     # Scrape profundo
     conteudo = scrape_concorrente(url)
@@ -1558,10 +1849,12 @@ def autopilot_worker():
         time.sleep(3600) # Checa a cada hora
 
 # Inicia o worker em background
-threading.Thread(target=autopilot_worker, daemon=True).start()
+if AUTOPILOT_WORKER_ENABLED:
+    threading.Thread(target=autopilot_worker, daemon=True).start()
 
 if __name__ == '__main__':
-    debug_enabled = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    is_production = os.getenv("ENV", "development").lower() == "production"
+    debug_enabled = (not is_production) and os.getenv("FLASK_DEBUG", "false").lower() == "true"
     print("INICIADO NA PORTA 5000")
     print("=> Verificando Banco Supabase: " + ("Conectado!" if supabase else "AUSENTE"), flush=True)
     print("=> Cliente Admin (service_role): " + ("OK" if supabase_admin else "Aviso: Usando anon_key"), flush=True)

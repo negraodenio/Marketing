@@ -37,19 +37,37 @@ function initApp() {
         checkAuth();
     });
 
-    // Conectar Meta Ads (passa token do usuário para identificação multiusuário)
+    // Conectar Meta Ads (sem expor JWT em query string)
     const btnConnectMeta = document.getElementById('btnConnectMeta');
     if (btnConnectMeta) {
-        btnConnectMeta.addEventListener('click', () => {
-            window.open(`/auth/meta/login?token=${encodeURIComponent(authToken)}`, '_blank');
+        btnConnectMeta.addEventListener('click', async () => {
+            try {
+                const res = await fetch('/api/oauth/meta/url', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (!res.ok || !data.auth_url) throw new Error(data.erro || 'Falha ao iniciar OAuth Meta');
+                window.open(data.auth_url, '_blank');
+            } catch (e) {
+                alert('Falha ao conectar Meta Ads. Faça login novamente e tente de novo.');
+            }
         });
     }
 
-    // Conectar TikTok Ads (passa token do usuário para identificação multiusuário)
+    // Conectar TikTok Ads (sem expor JWT em query string)
     const btnConnectTikTok = document.getElementById('btnConnectTikTok');
     if (btnConnectTikTok) {
-        btnConnectTikTok.addEventListener('click', () => {
-            window.open(`/auth/tiktok/login?token=${encodeURIComponent(authToken)}`, '_blank');
+        btnConnectTikTok.addEventListener('click', async () => {
+            try {
+                const res = await fetch('/api/oauth/tiktok/url', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (!res.ok || !data.auth_url) throw new Error(data.erro || 'Falha ao iniciar OAuth TikTok');
+                window.open(data.auth_url, '_blank');
+            } catch (e) {
+                alert('Falha ao conectar TikTok Ads. Faça login novamente e tente de novo.');
+            }
         });
     }
 

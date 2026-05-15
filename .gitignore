@@ -9,3 +9,48 @@ static/uploads/*
 
 .vercel
 .env*.local
+# Python
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+env/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Mac
+.DS_Store
+
+# Build
+dist/
+build/
+
+# Cache
+.cache/
+
+# Runtime temp
+tmp/
+temp/
+
+# Local configs
+.env.local
+.env.production
+.env.development
+
+# AI outputs / generated media
+generated/
+outputs/
+
+# Coverage
+.coverage
+htmlcov/
