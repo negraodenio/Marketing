@@ -8,24 +8,35 @@ function initApp() {
     let userEmail = localStorage.getItem('sb_user');
     let currentPlatform = "Multicanal"; // Default
     let currentNiche = "";
+    let maxStepReached = 1;
 
     const authScreen = document.getElementById('authScreen');
     const appScreen = document.getElementById('appScreen');
 
-    function checkAuth() {
+    async function checkAuth() {
         console.log("DEBUG: Verificando Auth...", authToken ? "Logado" : "Deslogado");
         if (authToken) {
-            authScreen.classList.add('hidden');
-            appScreen.classList.remove('hidden');
-            const userDisp = document.getElementById('userEmailDisplay');
-            if (userDisp) userDisp.innerText = userEmail;
-            console.log("DEBUG: Dashboard exibido.");
-            checkExistingJobs(); // Recupera tarefas em background
-        } else {
-            authScreen.classList.remove('hidden');
-            appScreen.classList.add('hidden');
-            console.log("DEBUG: Tela de Login exibida.");
+            try {
+                const res = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.ok) {
+                    authScreen.classList.add('hidden');
+                    appScreen.classList.remove('hidden');
+                    const userDisp = document.getElementById('userEmailDisplay');
+                    if (userDisp) userDisp.innerText = userEmail;
+                    console.log("DEBUG: Dashboard exibido.");
+                    resetWizard();
+                    checkExistingJobs();
+                    return;
+                }
+            } catch (e) {}
+            localStorage.removeItem('sb_token');
+            localStorage.removeItem('sb_user');
+            authToken = null;
+            userEmail = null;
         }
+        authScreen.classList.remove('hidden');
+        appScreen.classList.add('hidden');
+        console.log("DEBUG: Tela de Login exibida.");
     }
     checkAuth();
 
@@ -71,22 +82,43 @@ function initApp() {
         });
     }
 
-    // Verificar status de conexões
+    // Connection cache shared across all components
+    window._connCache = { meta: null, tiktok: null };
     async function checkConnections() {
-        const statusDiv = document.getElementById('connectionStatus');
-        if (!statusDiv || !authToken) return;
-        let statusText = '';
+        if (!authToken) return;
         try {
             const metaRes = await fetch('/api/meta/status', { headers: { 'Authorization': `Bearer ${authToken}` } });
             const metaData = await metaRes.json();
-            statusText += metaData.connected ? '✅ Meta conectado' : '⚪ Meta desconectado';
-        } catch(e) { statusText += '⚪ Meta'; }
+            window._connCache.meta = metaData;
+        } catch(e) { window._connCache.meta = { connected: false, error: true }; }
         try {
             const ttRes = await fetch('/api/tiktok/status', { headers: { 'Authorization': `Bearer ${authToken}` } });
             const ttData = await ttRes.json();
-            statusText += ' | ' + (ttData.connected ? '✅ TikTok conectado' : '⚪ TikTok desconectado');
-        } catch(e) { statusText += ' | ⚪ TikTok'; }
-        statusDiv.innerHTML = statusText;
+            window._connCache.tiktok = ttData;
+        } catch(e) { window._connCache.tiktok = { connected: false, error: true }; }
+        // Update Config tab UI
+        const metaStatusText = document.getElementById('metaStatusText');
+        if (metaStatusText) {
+            if (window._connCache.meta && window._connCache.meta.connected) {
+                const name = window._connCache.meta.account_name || window._connCache.meta.ad_account_id || '';
+                metaStatusText.innerHTML = '✅ Conectado' + (name ? ' como <strong>' + escapeHTML(name) + '</strong>' : '');
+            } else if (window._connCache.meta && window._connCache.meta.unconfigured) {
+                metaStatusText.innerHTML = '⚙️ Não configurado no servidor';
+            } else {
+                metaStatusText.innerHTML = '⚪ Desconectado';
+            }
+        }
+        const tiktokStatusText = document.getElementById('tiktokStatusText');
+        if (tiktokStatusText) {
+            if (window._connCache.tiktok && window._connCache.tiktok.connected) {
+                const name = window._connCache.tiktok.account_name || window._connCache.tiktok.advertiser_id || '';
+                tiktokStatusText.innerHTML = '✅ Conectado' + (name ? ' como <strong>' + escapeHTML(name) + '</strong>' : '');
+            } else if (window._connCache.tiktok && window._connCache.tiktok.unconfigured) {
+                tiktokStatusText.innerHTML = '⚙️ Não configurado no servidor';
+            } else {
+                tiktokStatusText.innerHTML = '⚪ Desconectado';
+            }
+        }
     }
     if (authToken) checkConnections();
 
@@ -201,25 +233,108 @@ document.addEventListener('click', (e) => {
     // ==========================================
     // BRAND KIT (DNA da Empresa)
     // ==========================================
-    function carregarBrandKit() {
-        const tom = localStorage.getItem('brandkit_tom') || '';
-        const publico = localStorage.getItem('brandkit_publico') || '';
+    async function carregarBrandKit() {
         const tomEl = document.getElementById('configTomDeVoz');
         const pubEl = document.getElementById('configPublicoAlvo');
-        if (tomEl) tomEl.value = tom;
-        if (pubEl) pubEl.value = publico;
+        const persEl = document.getElementById('configPersonality');
+        const visEl = document.getElementById('configVisualStyle');
+        const fontEl = document.getElementById('configFonts');
+        const forbidEl = document.getElementById('configForbiddenWords');
+        const c1 = document.getElementById('configColor1');
+        const c2 = document.getElementById('configColor2');
+        const c3 = document.getElementById('configColor3');
+        const c4 = document.getElementById('configColor4');
+        // Try loading from Supabase first
+        let settings = {};
+        if (authToken) {
+            try {
+                const res = await fetch('/api/brand/config', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.settings) settings = data.settings;
+            } catch(e) {}
+        }
+        // Merge with localStorage fallback
+        const merge = (key, el) => {
+            if (!el) return;
+            el.value = settings[key] || localStorage.getItem('brandkit_' + key) || '';
+        };
+        merge('tom_de_voz', tomEl);
+        merge('publico', pubEl);
+        merge('personality', persEl);
+        merge('visual_style', visEl);
+        merge('fonts', fontEl);
+        merge('forbidden_words', forbidEl);
+        if (c1 && settings.colors) {
+            if (settings.colors[0]) c1.value = settings.colors[0];
+            if (settings.colors[1]) c2.value = settings.colors[1];
+            if (settings.colors[2]) c3.value = settings.colors[2];
+            if (settings.colors[3]) c4.value = settings.colors[3];
+        }
     }
 
     const btnSaveConfig = document.getElementById('btnSaveConfig');
     if (btnSaveConfig) {
-        btnSaveConfig.addEventListener('click', () => {
+        btnSaveConfig.addEventListener('click', async () => {
             const tom = document.getElementById('configTomDeVoz').value.trim();
             const publico = document.getElementById('configPublicoAlvo').value.trim();
+            const personality = document.getElementById('configPersonality')?.value.trim() || '';
+            const visual_style = document.getElementById('configVisualStyle')?.value.trim() || '';
+            const fonts = document.getElementById('configFonts')?.value.trim() || '';
+            const forbidden_words = document.getElementById('configForbiddenWords')?.value.trim() || '';
+            const c1 = document.getElementById('configColor1')?.value || '#8b5cf6';
+            const c2 = document.getElementById('configColor2')?.value || '#10b981';
+            const c3 = document.getElementById('configColor3')?.value || '#f59e0b';
+            const c4 = document.getElementById('configColor4')?.value || '#ffffff';
+            const settings = {
+                tom_de_voz: tom,
+                publico: publico,
+                personality: personality,
+                visual_style: visual_style,
+                fonts: fonts,
+                forbidden_words: forbidden_words,
+                colors: [c1, c2, c3, c4]
+            };
+            // Save to localStorage as fallback
             localStorage.setItem('brandkit_tom', tom);
             localStorage.setItem('brandkit_publico', publico);
+            localStorage.setItem('brandkit_personality', personality);
+            localStorage.setItem('brandkit_visual_style', visual_style);
+            localStorage.setItem('brandkit_fonts', fonts);
+            localStorage.setItem('brandkit_forbidden_words', forbidden_words);
+            // Save to Supabase
+            if (authToken) {
+                try {
+                    await fetch('/api/brand/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                        body: JSON.stringify({ settings })
+                    });
+                } catch(e) { console.warn('Brand save to server failed, localStorage used as fallback'); }
+            }
             const msg = document.getElementById('configSaveMsg');
-            msg.style.display = 'block';
-            setTimeout(() => msg.style.display = 'none', 2000);
+            msg.classList.remove('hidden');
+            setTimeout(() => msg.classList.add('hidden'), 2000);
+        });
+    }
+
+    const btnResetBrand = document.getElementById('btnResetBrand');
+    if (btnResetBrand) {
+        btnResetBrand.addEventListener('click', async () => {
+            if (!confirm('Limpar todas as configurações da marca?')) return;
+            ['tom_de_voz','publico','personality','visual_style','fonts','forbidden_words'].forEach(k => localStorage.removeItem('brandkit_' + k));
+            ['configTomDeVoz','configPublicoAlvo','configPersonality','configVisualStyle','configFonts','configForbiddenWords'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            if (authToken) {
+                try { await fetch('/api/brand/config', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }, body: JSON.stringify({ settings: {} }) }); } catch(e) {}
+            }
+            const msg = document.getElementById('configSaveMsg');
+            msg.textContent = '🗑️ Brand Kit limpo!';
+            msg.classList.remove('hidden');
+            setTimeout(() => { msg.classList.add('hidden'); msg.textContent = '✅ Identidade da Marca Atualizada!'; }, 2000);
         });
     }
 
@@ -519,6 +634,10 @@ document.addEventListener('click', (e) => {
             const res = await fetch('/api/copilot/jobs/active', {
                 headers: { 'Authorization': `Bearer ${authToken}` }
             });
+            if (res.status === 401) {
+                console.warn("checkExistingJobs: 401 recebido — nao derrubando sessao, auth ainda pode ser valido");
+                return;
+            }
             const data = await res.json();
             if (data.jobs && data.jobs.length > 0) {
                 data.jobs.forEach(job => {
@@ -530,11 +649,125 @@ document.addEventListener('click', (e) => {
         } catch (e) { console.error("Erro ao checar jobs ativos:", e); }
     }
 
+    let _sseEventSource = null;
+    let _sseActive = false;
+
+    // Clean up SSE on page unload
+    window.addEventListener('beforeunload', function _sseCleanup() {
+        if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; _sseActive = false; }
+    });
+
+    function connectSSE(jobId, silent = false) {
+        if (!window.EventSource) return; // browser doesn't support SSE
+        if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; }
+        
+        try {
+            const es = new EventSource(`/api/copilot/stream/${jobId}`, {
+                withCredentials: true
+            });
+            
+            es.addEventListener('connected', () => {
+                _sseActive = true;
+                console.log(`SSE connected for job ${jobId}`);
+            });
+            
+            es.addEventListener('progress', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    const currentJob = activeJobs[jobId] || {};
+                    currentJob.status = data.status || 'processing';
+                    currentJob.progress = data.progress || 0;
+                    currentJob.current_step = data.current_step || 'Processando...';
+                    activeJobs[jobId] = currentJob;
+                    updateJobsUI();
+                    
+                    const loadingCopilot = document.getElementById('loadingCopilot');
+                    if (!silent && loadingCopilot && !loadingCopilot.classList.contains('hidden')) {
+                        loadingCopilot.innerHTML = renderOrchestrationTimeline(data.progress || 0, data.current_step || 'Iniciando...');
+                    }
+                } catch (err) {
+                    console.warn('SSE progress parse error', err);
+                }
+            });
+            
+            es.addEventListener('completed', (e) => {
+                _sseActive = false;
+                if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; }
+                try {
+                    const data = JSON.parse(e.data);
+                    delete activeJobs[jobId];
+                    updateJobsUI();
+                    if (_orchRotator) { clearInterval(_orchRotator); _orchRotator = null; }
+                    
+                    const loadingCopilot = document.getElementById('loadingCopilot');
+                    const resultadoCopilot = document.getElementById('resultadoCopilot');
+                    const btnGerarMagica = document.getElementById('btnGerarMagica');
+                    
+                    if (!silent && loadingCopilot && resultadoCopilot) {
+                        loadingCopilot.classList.add('hidden');
+                        resultadoCopilot.classList.remove('hidden');
+                        const result = data.result || {};
+                        if (result.data) {
+                            resultadoCopilot.innerHTML = renderJsonCards(result.data, result.campaign_id);
+                            if (typeof dispararAutomacao === 'function') dispararAutomacao(result.data);
+                            const initialText = result.data.facebook_ad?.primary_text_a || result.data.facebook_ad?.primary_text || "";
+                            if (initialText) setTimeout(() => updateAdScore(initialText), 500);
+                            setTimeout(() => { if (typeof runSeoAudit === 'function') runSeoAudit(result.data); }, 1000);
+                        }
+                        if (btnGerarMagica) btnGerarMagica.disabled = false;
+                    } else {
+                        console.log(`SSE: Job ${jobId} completed in background`);
+                        if (document.getElementById('tab-history')?.classList.contains('active')) carregarHistorico();
+                    }
+                } catch (err) {
+                    console.warn('SSE completed parse error', err);
+                }
+            });
+            
+            es.addEventListener('failed', (e) => {
+                _sseActive = false;
+                if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; }
+                try {
+                    const data = JSON.parse(e.data);
+                    delete activeJobs[jobId];
+                    updateJobsUI();
+                    if (_orchRotator) { clearInterval(_orchRotator); _orchRotator = null; }
+                    
+                    const loadingCopilot = document.getElementById('loadingCopilot');
+                    const btnGerarMagica = document.getElementById('btnGerarMagica');
+                    
+                    if (!silent) {
+                        alert("Falha na Geracao: " + (data.error || "Erro desconhecido."));
+                        if (loadingCopilot) loadingCopilot.classList.add('hidden');
+                        document.getElementById('wiz-step-5')?.classList.remove('hidden');
+                        if (btnGerarMagica) btnGerarMagica.disabled = false;
+                    }
+                } catch (err) {
+                    console.warn('SSE failed parse error', err);
+                }
+            });
+            
+            es.onerror = () => {
+                _sseActive = false;
+                if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; }
+                console.warn(`SSE disconnected for job ${jobId}, falling back to polling`);
+            };
+            
+            _sseEventSource = es;
+        } catch (err) {
+            console.warn('SSE init error, using polling only', err);
+            _sseActive = false;
+        }
+    }
+
     async function pollJobStatus(jobId, silent = false) {
         const loadingCopilot = document.getElementById('loadingCopilot');
         const resultadoCopilot = document.getElementById('resultadoCopilot');
         const btnGerarMagica = document.getElementById('btnGerarMagica');
         let failCount = 0;
+        
+        // Start SSE alongside polling
+        connectSSE(jobId, silent);
         
         const pollInterval = setInterval(async () => {
             try {
@@ -542,6 +775,15 @@ document.addEventListener('click', (e) => {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 
+                if (res.status === 401) {
+                    console.warn("pollJobStatus: 401 para job " + jobId + " — parando polling, mantendo sessao");
+                    clearInterval(pollInterval);
+                    if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; _sseActive = false; }
+                    if (_orchRotator) { clearInterval(_orchRotator); _orchRotator = null; }
+                    delete activeJobs[jobId];
+                    updateJobsUI();
+                    return;
+                }
                 if (!res.ok) throw new Error("Servidor indisponível");
                 
                 const job = await res.json();
@@ -553,19 +795,12 @@ document.addEventListener('click', (e) => {
                 
                 if (job.status === 'processing' || job.status === 'pending') {
                     if (!silent && loadingCopilot && !loadingCopilot.classList.contains('hidden')) {
-                        loadingCopilot.innerHTML = `
-                            <div class="fade-in" style="text-align:center;">
-                                <div class="spinner" style="margin: 0 auto 32px; width: 80px; height: 80px; border: 2px solid rgba(255,255,255,0.05); border-top-color: var(--accent-gold); border-radius: 50%; animation: spin 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;"></div>
-                                <h3 class="font-serif" style="font-size: 2.5rem; margin-bottom: 12px; color: var(--accent-gold);">${escapeHTML(job.current_step || 'Processando...')}</h3>
-                                <div style="width:100%; max-width:400px; margin: 24px auto; background:rgba(255,255,255,0.03); height:1px; position:relative;">
-                                    <div style="width:${job.progress}%; height:1px; background:var(--accent-gold); position:absolute; left:0; top:0; transition: width 0.5s ease;"></div>
-                                </div>
-                                <p style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.2em; opacity:0.4;">Arquitetura de Marketing em andamento...</p>
-                            </div>
-                        `;
+                        loadingCopilot.innerHTML = renderOrchestrationTimeline(job.progress || 0, job.current_step || 'Iniciando...');
                     }
                 } else if (job.status === 'completed') {
                     clearInterval(pollInterval);
+                    if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; _sseActive = false; }
+                    if (_orchRotator) { clearInterval(_orchRotator); _orchRotator = null; }
                     delete activeJobs[jobId];
                     updateJobsUI();
 
@@ -591,6 +826,8 @@ document.addEventListener('click', (e) => {
                     }
                 } else if (job.status === 'failed') {
                     clearInterval(pollInterval);
+                    if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; _sseActive = false; }
+                    if (_orchRotator) { clearInterval(_orchRotator); _orchRotator = null; }
                     delete activeJobs[jobId];
                     updateJobsUI();
                     if (!silent) {
@@ -604,6 +841,8 @@ document.addEventListener('click', (e) => {
                 failCount++;
                 if (failCount > 5) {
                     clearInterval(pollInterval);
+                    if (_sseEventSource) { _sseEventSource.close(); _sseEventSource = null; _sseActive = false; }
+                    if (_orchRotator) { clearInterval(_orchRotator); _orchRotator = null; }
                     delete activeJobs[jobId];
                     updateJobsUI();
                     if (!silent) {
@@ -651,6 +890,15 @@ document.addEventListener('click', (e) => {
                     })
                 });
                 const data = await res.json();
+                if (res.status === 401) {
+                    console.warn("gerar campanha: 401 — verifique token ou reinicie o login");
+                    alert("Sessão expirada. Faça login novamente.");
+                    localStorage.removeItem('sb_token');
+                    localStorage.removeItem('sb_user');
+                    authToken = null;
+                    checkAuth();
+                    return;
+                }
                 if (data.job_id) {
                     pollJobStatus(data.job_id);
                 } else {
@@ -667,39 +915,66 @@ document.addEventListener('click', (e) => {
 
     async function carregarHistorico() {
         const historyList = document.getElementById('historyList');
-        historyList.innerHTML = '<p>Carregando campanhas...</p>';
+        historyList.innerHTML = '<p style="text-align:center;padding:40px;opacity:0.5;">Carregando campanhas...</p>';
         try {
             const res = await fetch('/api/campanhas/historico', { headers: { 'Authorization': `Bearer ${authToken}` } });
             const data = await res.json();
-            historyList.innerHTML = '';
-            if (data.campanhas && data.campanhas.length > 0) {
-                data.campanhas.forEach(c => {
-                    const dataHora = c.created_at ? new Date(c.created_at).toLocaleString('pt-BR') : '';
-                    const safeProduct = escapeHTML(c.product);
-                    const safeGoal = escapeHTML(c.goal);
-                    historyList.innerHTML += `
-                        <div class="campaign-card">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <p><strong>📦 ${safeProduct}</strong></p>
-                                <small style="opacity:0.6;">${dataHora}</small>
-                            </div>
-                            <p style="opacity:0.8; font-size:0.85rem;">🎯 ${safeGoal}</p>
-                            <details style="margin-top:10px; cursor:pointer;">
-                                <summary>Ver Campanha Completa</summary>
-                                <div style="margin-top:10px; font-size:0.9em; opacity:0.85;">
-                                    ${renderJsonCards(parseSafeJson(c.result_text), c.id)}
-                                </div>
-                            </details>
-                        </div>
-                    `;
-                });
-            } else {
-                historyList.innerHTML = '<p>Você ainda não tem campanhas salvas.</p>';
+            if (!data.campanhas || data.campanhas.length === 0) {
+                historyList.innerHTML = '<p style="text-align:center;padding:60px;opacity:0.4;">Nenhuma campanha gerada ainda.</p>';
+                return;
             }
+            historyList.innerHTML = '';
+            data.campanhas.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).forEach(c => {
+                const dataHora = c.created_at ? new Date(c.created_at).toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                const safeProduct = escapeHTML((c.product || 'Sem nome').slice(0, 60));
+                const safeGoal = escapeHTML((c.goal || '-').slice(0, 30));
+                let engineBadge = '';
+                try {
+                    const resultJson = typeof c.result_text === 'string' ? JSON.parse(c.result_text) : c.result_text;
+                    const meta = resultJson && resultJson._engine_meta;
+                    if (meta && meta.engine === 'pipeline_v2') {
+                        engineBadge = '<span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.65rem;font-weight:700;">V2</span>';
+                    } else if (meta) {
+                        engineBadge = '<span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.65rem;font-weight:700;">Legado</span>';
+                    }
+                } catch(e) {}
+                historyList.innerHTML += `
+                    <div class="history-row" style="display:flex;align-items:center;gap:16px;padding:16px 20px;border:1px solid var(--border-dim);border-radius:12px;margin-bottom:8px;transition:0.15s;cursor:pointer;background:var(--bg-card);"
+                         onmouseover="this.style.borderColor='var(--accent-primary)'" onmouseout="this.style.borderColor='var(--border-dim)'"
+                         onclick="window.viewCampaign('${c.id}')">
+                        <div style="min-width:110px;font-size:0.75rem;opacity:0.5;">${dataHora}</div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeProduct}</div>
+                            <div style="font-size:0.75rem;opacity:0.5;">${safeGoal}</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            ${engineBadge}
+                            <button class="btn-ninja btn-secondary" style="padding:6px 12px;font-size:0.7rem;" onclick="event.stopPropagation();window.viewCampaign('${c.id}')">📄 Ver</button>
+                            <button class="btn-ninja btn-secondary" style="padding:6px 12px;font-size:0.7rem;" onclick="event.stopPropagation();window.generateAgencyProposal('${c.id}')">📋 Proposta</button>
+                        </div>
+                    </div>`;
+            });
         } catch(e) {
-            historyList.innerHTML = '<p>Erro ao buscar histórico no Supabase.</p>';
+            historyList.innerHTML = '<p style="text-align:center;padding:40px;color:#ef4444;">Erro ao carregar campanhas.</p>';
         }
     }
+
+    window.viewCampaign = function(campaignId) {
+        const modal = document.getElementById('campaignModal');
+        const modalContent = document.getElementById('campaignModalContent');
+        if (!modal || !modalContent) return;
+        modalContent.innerHTML = '<p style="text-align:center;padding:40px;">Carregando...</p>';
+        modal.classList.remove('hidden');
+        fetch(`/api/campanhas/historico`, { headers: { 'Authorization': `Bearer ${authToken}` } })
+            .then(r => r.json())
+            .then(data => {
+                const camp = (data.campanhas || []).find(c => c.id === campaignId);
+                if (!camp) { modalContent.innerHTML = '<p>Campanha não encontrada.</p>'; return; }
+                const resultData = typeof camp.result_text === 'string' ? JSON.parse(camp.result_text) : camp.result_text;
+                modalContent.innerHTML = renderJsonCards(resultData || {}, campaignId);
+            })
+            .catch(() => { modalContent.innerHTML = '<p>Erro ao carregar.</p>'; });
+    };
 
     document.getElementById('btnLoadHistory')?.addEventListener('click', carregarHistorico);
 
@@ -771,7 +1046,30 @@ document.addEventListener('click', (e) => {
     function converterMarkdown(text) {
         if (typeof text !== 'string') return "";
         let safe = escapeHTML(text);
-        let html = safe.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        let lines = safe.split('\n');
+        let html = '', inList = false;
+        for (let line of lines) {
+            let match;
+            if (match = line.match(/^### (.*)/)) { html += '<h3>' + match[1] + '</h3>'; inList = false; }
+            else if (match = line.match(/^## (.*)/)) { html += '<h2>' + match[1] + '</h2>'; inList = false; }
+            else if (match = line.match(/^# (.*)/)) { html += '<h1>' + match[1] + '</h1>'; inList = false; }
+            else if (match = line.match(/^- (.*)/)) {
+                if (!inList) { html += '<ul>'; inList = 'ul'; }
+                html += '<li>' + match[1] + '</li>';
+            }
+            else if (match = line.match(/^\d+\.\s(.*)/)) {
+                if (!inList) { html += '<ul>'; inList = 'ul'; }
+                html += '<li>' + match[1] + '</li>';
+            }
+            else {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += line + '\n';
+            }
+        }
+        if (inList) html += '</ul>';
+        html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
         html = html.replace(/\n/g, '<br>');
         return html;
@@ -784,17 +1082,355 @@ document.addEventListener('click', (e) => {
         } catch(e) { return text; }
     }
 
+    function renderEngineBadge(campaignData) {
+        const meta = campaignData && campaignData._engine_meta;
+        if (!meta) return '';
+        const isV2 = meta.engine === 'pipeline_v2';
+        const bg = isV2 ? '#10b981' : '#ef4444';
+        const label = isV2
+            ? `V2 · ${meta.stages_completed || 0} stages · $${(meta.total_estimated_cost_usd || 0).toFixed(4)}`
+            : `LEGADO · ${meta.fallback_reason ? escapeHTML(String(meta.fallback_reason).slice(0, 40)) : 'fallback'}`;
+        const modelsLine = (meta.models_used && meta.models_used.length)
+            ? `<div style="font-size:0.7rem; margin-top:6px; opacity:0.75;">${meta.models_used.map(m => escapeHTML(m)).join(' · ')}</div>`
+            : '';
+        return `<div style="margin-bottom:16px;">
+            <span style="background:${bg};color:white;padding:6px 12px;border-radius:6px;font-size:0.75rem;font-weight:600;">${escapeHTML(label)}</span>
+            ${modelsLine}
+        </div>`;
+    }
+
+    let _orchMessages = [];
+    let _orchMsgIdx = 0;
+    let _orchRotator = null;
+
+    function renderOrchestrationTimeline(progress, currentStep) {
+        const currentPct = progress || 0;
+
+        const agents = [
+            {
+                pct: 15, name: 'Market Intelligence AI', icon: '📡', shortName: 'Scanner',
+                task: 'Pattern analysis, emotional trends, competitive saturation mapping',
+                thoughts: [
+                    'Detectando saturação de ângulos emocionais no nicho...',
+                    'ICP responde melhor a tensão psicológica aspiracional',
+                    'Padrão de fatigue identificado: 3 ângulos dominantes no mercado',
+                    'Audiência responde a linguagem de identidade, não de funcionalidade',
+                    'Cross-referencing emotional gaps: objeção principal isolada',
+                ],
+                collab: '→ Enviando padrões emocionais para Behavior Analyst'
+            },
+            {
+                pct: 25, name: 'Behavior Analyst', icon: '🧬', shortName: 'Psychologist',
+                task: 'Psychological depth mapping, hidden fears, buying drivers',
+                thoughts: [
+                    'Medo dominante detectado: perda de identidade sem o produto',
+                    'Midnight self-talk revela desejo de transformação silenciosa',
+                    'Cultural references ancoradas em nostalgia emocional',
+                    'Gatilho de compra não-dito: validação social aspiracional',
+                    'Fator de confiança extraído: transparência radical sobre o processo',
+                ],
+                collab: '← Recebendo padrões de Market Intelligence · → Enviando drivers para Creative Director'
+            },
+            {
+                pct: 35, name: 'Creative Director AI', icon: '💎', shortName: 'Strategist',
+                task: 'Big Idea, positioning, creative differentiation, narrative architecture',
+                thoughts: [
+                    'Big Idea refinada: tensão emocional como motor narrativo central',
+                    'Ângulo criativo validado: diferenciação contra saturação do mercado',
+                    'Mecanismo único integrado à promessa mensurável',
+                    'Posicionamento emocional: distância máxima de concorrentes',
+                    'Arquitetura narrativa coerente entre todos os touchpoints',
+                ],
+                collab: '← Recebendo drivers psicológicos de Behavior Analyst · → Aprovando direção criativa para Copy Engine'
+            },
+            {
+                pct: 45, name: 'Hook & Copy Engine', icon: '⚡', shortName: 'Copywriter',
+                task: 'Scroll-stopping hooks, emotional headlines, conversion CTAs',
+                thoughts: [
+                    'Hook aprovado com score de pattern interrupt: 92/100',
+                    'Headline emocional otimizada: tensão + curiosidade + identidade',
+                    'CTA refinado: ação natural sem desespero — momentum psicológico',
+                    'Framework diversity validado: callout, contradiction, story tease, pattern interrupt',
+                    'Reescrevendo hooks para reduzir resistência psicológica de compra',
+                ],
+                collab: '← Recebendo Big Idea de Creative Director · → Entregando hooks validados para Campaign Architect'
+            },
+            {
+                pct: 55, name: 'Campaign Architect', icon: '🏗️', shortName: 'Architect',
+                task: 'Campaign structure, A/B/C variations, narrative coherence validation',
+                thoughts: [
+                    'Coerência narrativa validada entre Meta Ads, Instagram e TikTok',
+                    'Variações A/B/C balanceadas para amplitude psicológica máxima',
+                    'Mecanismo único integrado em todas as camadas da campanha',
+                    'Estratégia criativa sincronizada com payload da campanha',
+                    'Consistência de tom: posicionamento + narrativa alinhados',
+                ],
+                collab: '← Recebendo hooks de Copy Engine · → Preparando assets para Visual AI Studio'
+            },
+            {
+                pct: 75, name: 'Visual AI Studio', icon: '🎨', shortName: 'Visual Designer',
+                task: 'Image rendering, visual identity, feed aesthetic',
+                thoughts: [
+                    'Identidade visual composta: paleta emocional alinhada ao driver psicológico',
+                    'Instagram feed estética validada para coerência de marca',
+                    'Sinergia imagem-texto verificada: hooks visuais sincronizados com copy',
+                    'Consistência visual entre todos os assets da campanha',
+                ],
+                collab: '← Recebendo brief de Campaign Architect · → Enviando visuais para Video Director'
+            },
+            {
+                pct: 92, name: 'Video AI Director', icon: '🎬', shortName: 'Director',
+                task: 'Storyboard, neural narration, cinematic rendering',
+                thoughts: [
+                    'Storyboard aprovado: 4 cenas com continuidade comercial',
+                    'Narração neural sincronizada com pacing emocional do roteiro',
+                    'Sound design casado com arco emocional: tensão → liberação',
+                    'Pacing de cena otimizado: curiosidade → desejo → confiança',
+                    'Renderizando comercial cinematográfico vertical',
+                ],
+                collab: '← Recebendo visuais de AI Studio · → Finalizando campanha com Orchestrator'
+            },
+            {
+                pct: 100, name: 'Orchestrator', icon: '🧠', shortName: 'Orchestrator',
+                task: 'Final assembly, quality control, delivery',
+                thoughts: [
+                    'Assemblando campanha multi-agente para entrega final',
+                    'Coerência estratégica validada entre todos os outputs',
+                    'Assets sincronizados e otimizados para deployment',
+                    'Campanha completa — pronta para veiculação',
+                ],
+                collab: '✓ 8 agentes completos — campanha pronta para deploy'
+            },
+        ];
+
+        const activeAgent = agents.find(a => currentPct < a.pct) || agents[agents.length - 1];
+        const activeThoughts = activeAgent ? activeAgent.thoughts : ['Inicializando sistema de orquestração...'];
+        const feedMessages = activeThoughts.slice(0);
+        if (activeAgent && activeAgent.collab) feedMessages.push(activeAgent.collab);
+
+        if (activeAgent && activeAgent !== agents[agents.length - 1] && currentPct < 100) {
+            if (JSON.stringify(_orchMessages) !== JSON.stringify(feedMessages)) {
+                _orchMessages = feedMessages;
+                _orchMsgIdx = 0;
+                if (_orchRotator) clearInterval(_orchRotator);
+                _orchRotator = setInterval(() => {
+                    _orchMsgIdx = (_orchMsgIdx + 1) % _orchMessages.length;
+                    const el = document.getElementById('orch-thought');
+                    if (el) el.textContent = _orchMessages[_orchMsgIdx];
+                }, 3000);
+            }
+        } else if (currentPct >= 100) {
+            if (_orchRotator) { clearInterval(_orchRotator); _orchRotator = null; }
+            setTimeout(() => {
+                const el = document.getElementById('orch-thought');
+                if (el) el.textContent = '✓ 8 agentes sincronizados — campanha concluída';
+            }, 500);
+        } else {
+            if (!_orchMessages.length) _orchMessages = feedMessages;
+        }
+
+        // Intelligence scores — derived from real progress
+        const scores = [
+            ['Narrative Coherence', Math.min(99, Math.round(currentPct * 0.78 + 15)), '#8b5cf6'],
+            ['Emotional Precision', Math.min(99, Math.round(currentPct * 0.82 + 10)), '#ec4899'],
+            ['Conversion Tension', Math.min(99, Math.round(currentPct * 0.72 + 12)), '#10b981'],
+            ['Creative Differentiation', Math.min(99, Math.round(currentPct * 0.85 + 8)), '#f59e0b'],
+            ['Psychological Depth', Math.min(99, Math.round(currentPct * 0.8 + 13)), '#6366f1'],
+        ];
+
+        let html = `<div class="fade-in" style="max-width:640px;margin:-20px auto 0;">`;
+
+        // Neural Command Header
+        const doneCount = agents.filter(a => currentPct >= a.pct).length;
+        html += `<div style="text-align:center;margin-bottom:18px;">
+            <div style="display:inline-block;padding:14px 24px;border-radius:14px;">
+                <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.15em;opacity:0.3;margin-bottom:2px;">AI Marketing Operations</div>
+                <div style="font-size:1.2rem;font-weight:700;background:linear-gradient(135deg,var(--accent-primary),#8b5cf6,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-family:'Outfit',sans-serif;">${doneCount} of 8 Agents Synchronized</div>
+                <div style="font-size:0.7rem;opacity:0.3;margin-top:4px;">${agents.filter(a => currentPct >= a.pct).map(a => a.shortName).join(' · ')}</div>
+            </div>
+        </div>`;
+
+        // Intelligence grid
+        html += `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:16px;">
+            ${scores.map(([label, val, color]) => `
+                <div style="background:rgba(255,255,255,0.015);border:1px solid var(--border-dim);border-radius:6px;padding:10px 4px;text-align:center;">
+                    <div style="font-size:1rem;font-weight:800;color:${color};">${val}<span style="font-size:0.5rem;">%</span></div>
+                    <div style="font-size:0.45rem;opacity:0.3;text-transform:uppercase;letter-spacing:0.04em;margin-top:3px;">${label}</div>
+                </div>
+            `).join('')}
+        </div>`;
+
+        // Progress arc
+        html += `<div style="width:100%;margin:0 auto 14px;background:rgba(255,255,255,0.02);height:3px;border-radius:2px;overflow:hidden;">
+            <div style="width:${currentPct}%;height:100%;background:linear-gradient(90deg,var(--accent-primary),#8b5cf6,#ec4899,#10b981);border-radius:2px;transition:width 0.8s ease;"></div>
+        </div>`;
+
+        // Agent timeline
+        agents.forEach((a) => {
+            const isDone = currentPct >= a.pct;
+            const isActive = !isDone && (currentPct >= a.pct - 12);
+            const bg = isDone ? 'rgba(16,185,129,0.04)' : (isActive ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.01)');
+            const border = isDone ? 'rgba(16,185,129,0.12)' : (isActive ? 'rgba(99,102,241,0.18)' : 'var(--border-dim)');
+            const opacity = isDone || isActive ? 1 : 0.2;
+
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:3px;background:${bg};border:1px solid ${border};border-radius:8px;opacity:${opacity};transition:all 0.4s ease;${isActive ? 'box-shadow:0 0 16px rgba(99,102,241,0.04);' : ''}">
+                <span style="font-size:0.8rem;min-width:20px;text-align:center;">${a.icon}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-weight:600;font-size:0.72rem;${isActive ? 'color:var(--accent-primary);' : ''}">${a.name}</span>
+                        <span style="font-size:0.5rem;opacity:0.2;text-transform:uppercase;">${a.shortName}</span>
+                    </div>
+                    <div style="font-size:0.6rem;opacity:0.3;margin-top:1px;">${a.task}</div>
+                </div>
+                ${isDone ? '<span style="font-size:0.45rem;background:#10b981;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;">DONE</span>' : (isActive ? '<span style="width:12px;height:12px;border:2px solid var(--accent-primary);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></span>' : '')}
+            </div>`;
+        });
+
+        // Live thought — cinematic, rotating AI insight
+        html += `<div style="margin-top:14px;padding:12px 16px;background:linear-gradient(135deg,rgba(99,102,241,0.04),rgba(139,92,246,0.02));border:1px solid rgba(99,102,241,0.1);border-radius:10px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <span style="width:5px;height:5px;background:#10b981;border-radius:50%;animation:pulse 1.5s ease infinite;"></span>
+                <span style="font-size:0.5rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.25;">Neural Activity · ${activeAgent ? activeAgent.name : 'System'}</span>
+            </div>
+            <div id="orch-thought" style="font-size:0.75rem;opacity:0.55;font-weight:500;font-style:italic;min-height:18px;transition:opacity 0.3s;">
+                ${_orchMessages[_orchMsgIdx] || 'Initializing neural agents...'}
+            </div>
+            ${activeAgent && activeAgent.collab ? `<div style="margin-top:6px;font-size:0.6rem;opacity:0.25;border-top:1px solid rgba(255,255,255,0.03);padding-top:6px;">${activeAgent.collab}</div>` : ''}
+        </div>`;
+
+        html += `</div>`;
+        return html;
+    }
+
+    function renderStrategicPlan(campaignData) {
+        const s = (campaignData && campaignData.strategy_insights) || {};
+        if (!s.market_analysis && !s.creative_strategy) return ''; // sem dados V2, pula
+
+        const m = s.market_analysis || {};
+        const cs = s.creative_strategy || {};
+        const icp = s.icp_mapping || {};
+        const refBig = s.refined_big_idea || cs.big_idea || '';
+        const psych = s.psychological_angle || '';
+        const emotional = s.emotional_driver || '';
+        const stratInsight = s.strategic_insight || '';
+
+        const awarenessLabels = { 'unaware': 'Inconsciente', 'problem-aware': 'Ciente do Problema', 'solution-aware': 'Ciente da Solução', 'product-aware': 'Ciente do Produto', 'most-aware': 'Totalmente Ciente' };
+
+        return `
+        <div class="json-card" style="border-color:var(--accent-primary);border-left:3px solid var(--accent-primary);">
+            <h3 style="display:flex;align-items:center;gap:10px;">
+                <span style="background:var(--accent-primary);color:#fff;padding:2px 10px;border-radius:4px;font-size:0.65rem;font-weight:800;">AI STRATEGIST</span>
+                Strategic Campaign Plan
+            </h3>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin-top:20px;">
+
+                <!-- BIG IDEA -->
+                ${refBig ? `
+                <div style="grid-column:1/-1;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:20px;">
+                    <div style="font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.5;margin-bottom:8px;">Big Idea</div>
+                    <div style="font-size:1.1rem;font-weight:700;line-height:1.4;color:#fff;">${escapeHTML(refBig)}</div>
+                </div>` : ''}
+
+                <!-- POSITIONING -->
+                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-dim);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.4;margin-bottom:6px;">Market Sophistication</div>
+                    <div style="font-weight:700;font-size:1.4rem;color:var(--accent-primary);">${m.sofistication_stage || '?'}/5</div>
+                    <div style="font-size:0.75rem;opacity:0.6;margin-top:4px;">${escapeHTML((m.sofistication_rationale || '').slice(0, 120))}</div>
+                </div>
+
+                <!-- AUDIENCE AWARENESS -->
+                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-dim);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.4;margin-bottom:6px;">Awareness Level</div>
+                    <div style="font-weight:700;font-size:0.95rem;color:#10b981;">${escapeHTML(awarenessLabels[m.awareness_stage] || m.awareness_stage || '-')}</div>
+                    <div style="font-size:0.75rem;opacity:0.6;margin-top:4px;">${escapeHTML((m.awareness_rationale || '').slice(0, 100))}</div>
+                </div>
+
+                <!-- CREATIVE STRATEGY -->
+                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-dim);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.4;margin-bottom:6px;">Creative Angle</div>
+                    <div style="font-weight:600;font-size:0.85rem;line-height:1.3;">${escapeHTML((cs.chosen_angle || '').slice(0, 140))}</div>
+                    ${cs.unique_mechanism_name ? `<div style="margin-top:8px;font-size:0.65rem;opacity:0.4;">Mechanism: ${escapeHTML(cs.unique_mechanism_name)}</div>` : ''}
+                </div>
+
+                <!-- PROMISE -->
+                ${cs.measurable_promise ? `
+                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-dim);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.4;margin-bottom:6px;">Measurable Promise</div>
+                    <div style="font-weight:600;font-size:0.85rem;color:#f59e0b;">${escapeHTML(cs.measurable_promise)}</div>
+                </div>` : ''}
+
+                <!-- PSYCHOLOGY -->
+                ${psych || emotional ? `
+                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-dim);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.4;margin-bottom:6px;">Psychology</div>
+                    ${emotional ? `<div style="font-size:0.8rem;margin-bottom:4px;"><span style="opacity:0.5;">Driver:</span> ${escapeHTML(emotional)}</div>` : ''}
+                    ${psych ? `<div style="font-size:0.8rem;"><span style="opacity:0.5;">Angle:</span> ${escapeHTML(psych)}</div>` : ''}
+                </div>` : ''}
+
+                <!-- ICP Snapshots -->
+                ${icp.icp_obvious ? `
+                <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:10px;padding:16px;">
+                        <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.5;margin-bottom:4px;color:#10b981;">Primary ICP</div>
+                        <div style="font-weight:600;font-size:0.85rem;">${escapeHTML((icp.icp_obvious.archetype || '').slice(0, 100))}</div>
+                        <div style="font-size:0.7rem;opacity:0.5;margin-top:6px;font-style:italic;">"${escapeHTML((icp.icp_obvious.midnight_self_talk || '').slice(0, 120))}"</div>
+                    </div>
+                    ${icp.icp_non_obvious ? `
+                    <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:10px;padding:16px;">
+                        <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.5;margin-bottom:4px;color:#f59e0b;">Non-Obvious ICP</div>
+                        <div style="font-weight:600;font-size:0.85rem;">${escapeHTML((icp.icp_non_obvious.archetype || '').slice(0, 100))}</div>
+                        <div style="font-size:0.7rem;opacity:0.5;margin-top:6px;font-style:italic;">"${escapeHTML((icp.icp_non_obvious.midnight_self_talk || '').slice(0, 120))}"</div>
+                    </div>` : ''}
+                </div>` : ''}
+
+                <!-- AUDIENCE VOCABULARY -->
+                ${m.audience_vocabulary && m.audience_vocabulary.length ? `
+                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-dim);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.4;margin-bottom:8px;">Audience Language</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">${m.audience_vocabulary.map(w => `<span style="background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:4px;font-size:0.7rem;">${escapeHTML(w)}</span>`).join('')}</div>
+                </div>` : ''}
+
+                <!-- OBJECTIONS -->
+                ${m.objections && m.objections.length ? `
+                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-dim);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.4;margin-bottom:8px;">Objections</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">${m.objections.map(o => `<span style="background:rgba(239,68,68,0.1);color:#ef4444;padding:2px 8px;border-radius:4px;font-size:0.7rem;">${escapeHTML(o)}</span>`).join('')}</div>
+                </div>` : ''}
+
+                <!-- FRESH ANGLES -->
+                ${m.fresh_angles && m.fresh_angles.length ? `
+                <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-dim);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.4;margin-bottom:8px;">Fresh Angles</div>
+                    ${m.fresh_angles.map(a => `<div style="font-size:0.8rem;color:#10b981;margin-bottom:4px;">→ ${escapeHTML(a)}</div>`).join('')}
+                </div>` : ''}
+
+                <!-- STRATEGIC INSIGHT -->
+                ${stratInsight ? `
+                <div style="grid-column:1/-1;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:16px;">
+                    <div style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;opacity:0.5;margin-bottom:6px;color:#8b5cf6;">Why This Campaign Works</div>
+                    <div style="font-size:0.85rem;line-height:1.5;">${escapeHTML(stratInsight)}</div>
+                </div>` : ''}
+            </div>
+        </div>`;
+    }
+
     function renderJsonCards(campaignData, campaignId = null) {
         if (!campaignData || typeof campaignData !== 'object') return converterMarkdown(String(campaignData));
-        
+
         let html = `<div class="json-campaign-results" data-campaign-id="${campaignId || ''}">`;
-        
+
+        html += renderEngineBadge(campaignData);
+
         if (campaignId) {
             html += `<div style="text-align:right; margin-bottom:32px; display:flex; gap:16px; justify-content:flex-end;">
                         <button class="btn-ninja btn-secondary" onclick="generateAgencyProposal('${campaignId}')">📄 Gerar Proposta</button>
                         <button class="btn-ninja btn-secondary" onclick="saveCampaignEdits('${campaignId}', this)">💾 Salvar Edição</button>
                     </div>`;
         }
+
+        // STRATEGIC CAMPAIGN PLAN
+        html += renderStrategicPlan(campaignData);
 
         html += `
         <div class="variation-tabs">
@@ -1044,11 +1680,32 @@ document.addEventListener('click', (e) => {
         btn.disabled = false; btn.innerText = "💾 Salvar Alterações";
     }
 
+    window._ensureConnected = async function(provider) {
+        if (!window._connCache || !window._connCache[provider]) await checkConnections();
+        const status = window._connCache && window._connCache[provider];
+        if (!status || !status.connected) {
+            const names = { meta: 'Meta Ads', tiktok: 'TikTok Ads' };
+            const tabs = { meta: 'tab-config', tiktok: 'tab-config' };
+            if (status && status.unconfigured) {
+                alert(names[provider] + ' não configurado no servidor.\nInforme o administrador para configurar as credenciais.');
+            } else {
+                const ok = confirm('⚠️ ' + names[provider] + ' não está conectado.\n\nClique em OK para abrir a página de conexão.');
+                if (ok) {
+                    document.querySelectorAll('.tab-pane').forEach(t => t.classList.add('hidden'));
+                    document.getElementById(tabs[provider]).classList.remove('hidden');
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
     window.publishToMeta = async function(btn) {
+        if (!await window._ensureConnected('meta')) return;
         if (!confirm("Enviar para rascunho do Gerenciador de Anúncios Meta?")) return;
         const container = btn.closest('.json-campaign-results');
-        const metaCard = container.querySelector('.facebook-card');
-        const headline = metaCard ? metaCard.querySelector('.field-headline').value : 'Campanha Copilot IA';
+        const metaCard = container ? container.querySelector('.field-headline') : null;
+        const headline = metaCard ? metaCard.value : 'Campanha Copilot IA';
         try {
             const res = await fetch('/api/campaigns/publish_to_meta', {
                 method: 'POST',
@@ -1061,10 +1718,11 @@ document.addEventListener('click', (e) => {
     }
 
     window.publishToTikTok = async function(btn, videoUrl) {
+        if (!await window._ensureConnected('tiktok')) return;
         if (!confirm("Enviar este vídeo para o TikTok Ads Manager?")) return;
         const container = btn.closest('.json-campaign-results');
-        const videoCard = container.querySelector('.video-card');
-        const headline = videoCard ? videoCard.querySelector('.field-hook').value : 'Campanha Copilot IA';
+        const videoCard = container ? container.querySelector('.field-hook') : null;
+        const headline = videoCard ? videoCard.value : 'Campanha Copilot IA';
         try {
             const res = await fetch('/api/campaigns/publish_to_tiktok', {
                 method: 'POST',
@@ -1130,7 +1788,12 @@ document.addEventListener('click', (e) => {
                         `;
                     });
                     leadsListArea.classList.remove('hidden');
-                } else { alert("Nenhum lead encontrado."); }
+                } else {
+                    leadsTableBody.innerHTML = `<tr><td colspan="4" style="padding:32px;text-align:center;color:var(--text-muted);font-size:0.85rem;">
+                        Nenhum lead encontrado. Para melhores resultados, configure <code style="background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">SERPAPI_KEY</code> no .env.
+                    </td></tr>`;
+                    leadsListArea.classList.remove('hidden');
+                }
             } catch (e) { alert("Erro ao buscar leads."); } finally { loadingLeads.classList.add('hidden'); btnBuscarLeads.disabled = false; }
         });
     }

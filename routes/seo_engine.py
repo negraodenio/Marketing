@@ -1,8 +1,36 @@
 from flask import Blueprint, request, jsonify, session
 import openai
 import json, re, os
+from dotenv import load_dotenv
+from supabase import create_client
+
+load_dotenv(override=True)
 
 seo_bp = Blueprint("seo", __name__, url_prefix="/api/seo")
+
+# ─── Auth Check ────────────────────────────────────────────────────────────────
+def _check_auth():
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth.split(" ", 1)[1]
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    try:
+        sb = create_client(url, key)
+        user = sb.auth.get_user(token)
+        return user.user
+    except Exception:
+        return None
+
+@seo_bp.before_request
+def _require_auth():
+    if request.method == "OPTIONS":
+        return None
+    if not _check_auth():
+        return jsonify({"erro": "Não autorizado"}), 401
 
 # Configuration
 client = openai.OpenAI(

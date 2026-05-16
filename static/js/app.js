@@ -8,6 +8,7 @@ function initApp() {
     let userEmail = localStorage.getItem('sb_user');
     let currentPlatform = "Multicanal"; // Default
     let currentNiche = "";
+    let maxStepReached = 1;
 
     const authScreen = document.getElementById('authScreen');
     const appScreen = document.getElementById('appScreen');
@@ -28,6 +29,22 @@ function initApp() {
         }
     }
     checkAuth();
+
+    // Valida token com servidor — se invalido, forca logout imediato
+    async function validateSession() {
+        if (!authToken) return;
+        try {
+            const res = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${authToken}` } });
+            if (!res.ok) throw new Error('Token invalido');
+        } catch (e) {
+            localStorage.removeItem('sb_token');
+            localStorage.removeItem('sb_user');
+            authToken = null;
+            userEmail = null;
+            checkAuth();
+        }
+    }
+    validateSession();
 
     // Logout
     document.getElementById('btnLogout')?.addEventListener('click', () => {
@@ -651,6 +668,15 @@ document.addEventListener('click', (e) => {
                     })
                 });
                 const data = await res.json();
+                if (res.status === 401) {
+                    console.warn("gerar campanha: 401 — sessao expirada");
+                    alert("Sessão expirada. Faça login novamente.");
+                    localStorage.removeItem('sb_token');
+                    localStorage.removeItem('sb_user');
+                    authToken = null;
+                    checkAuth();
+                    return;
+                }
                 if (data.job_id) {
                     pollJobStatus(data.job_id);
                 } else {
@@ -784,11 +810,30 @@ document.addEventListener('click', (e) => {
         } catch(e) { return text; }
     }
 
+    function renderEngineBadge(campaignData) {
+        const meta = campaignData && campaignData._engine_meta;
+        if (!meta) return '';
+        const isV2 = meta.engine === 'pipeline_v2';
+        const bg = isV2 ? '#10b981' : '#ef4444';
+        const label = isV2
+            ? `V2 · ${meta.stages_completed || 0} stages · $${(meta.total_estimated_cost_usd || 0).toFixed(4)}`
+            : `LEGADO · ${meta.fallback_reason ? escapeHTML(String(meta.fallback_reason).slice(0, 80)) : 'fallback'}`;
+        const modelsLine = (meta.models_used && meta.models_used.length)
+            ? `<div style="font-size:0.7rem; margin-top:6px; opacity:0.75;">${meta.models_used.map(m => escapeHTML(m)).join(' · ')}</div>`
+            : '';
+        return `<div style="margin-bottom:16px;">
+            <span style="background:${bg};color:white;padding:6px 12px;border-radius:6px;font-size:0.75rem;font-weight:600;">${escapeHTML(label)}</span>
+            ${modelsLine}
+        </div>`;
+    }
+
     function renderJsonCards(campaignData, campaignId = null) {
         if (!campaignData || typeof campaignData !== 'object') return converterMarkdown(String(campaignData));
-        
+
         let html = `<div class="json-campaign-results" data-campaign-id="${campaignId || ''}">`;
-        
+
+        html += renderEngineBadge(campaignData);
+
         if (campaignId) {
             html += `<div style="text-align:right; margin-bottom:32px; display:flex; gap:16px; justify-content:flex-end;">
                         <button class="btn-ninja btn-secondary" onclick="generateAgencyProposal('${campaignId}')">📄 Gerar Proposta</button>
