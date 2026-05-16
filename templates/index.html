@@ -11,56 +11,110 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700;800&display=swap');
         :root {
             --accent-primary: #6366f1;
             --accent-glow: rgba(99, 102, 241, 0.25);
             --bg-main: #0a0b10;
             --bg-card: #12141c;
+            --bg-input: rgba(0, 0, 0, 0.25);
             --border-dim: rgba(255, 255, 255, 0.08);
             --border-highlight: rgba(255, 255, 255, 0.15);
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
-            --radius-lg: 24px;
+            --radius-lg: 20px;
             --radius-md: 12px;
             --shadow-pro: 0 20px 50px rgba(0, 0, 0, 0.6);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: var(--bg-main); color: var(--text-primary); font-family: 'Inter', sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; }
-        .pro-dashboard { display: flex; min-height: 100vh; }
-        .pro-sidebar { width: 280px; background: var(--bg-card); border-right: 1px solid var(--border-dim); padding: 32px 24px; display: flex; flex-direction: column; }
-        .pro-main { flex: 1; padding: 48px; max-width: 1200px; margin: 0 auto; }
-        h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; letter-spacing: -0.02em; }
-        .json-card { background: var(--bg-card); border: 1px solid var(--border-dim); border-radius: var(--radius-lg); padding: 40px; margin-bottom: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .json-card:hover { border-color: var(--border-highlight); box-shadow: var(--shadow-pro); transform: translateY(-2px); }
-        .field-group { margin-bottom: 28px; display: flex; flex-direction: column; width: 100%; }
-        .field-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 10px; padding-left: 4px; }
-        .draft-edit { width: 100%; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-dim); border-radius: var(--radius-md); padding: 18px; color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: 1rem; line-height: 1.6; transition: 0.2s; outline: none; resize: vertical; display: block; min-height: 56px; }
-        .draft-edit:focus { border-color: var(--accent-primary); background: rgba(0, 0, 0, 0.4); box-shadow: 0 0 0 4px var(--accent-glow); }
-        .oracle-score-container { display: grid; grid-template-columns: 280px 1fr; gap: 60px; align-items: center; background: rgba(255, 255, 255, 0.02); padding: 32px; border-radius: var(--radius-md); border: 1px solid var(--border-dim); }
-        .circular-progress { width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(var(--accent-primary) calc(var(--progress) * 3.6deg), rgba(255,255,255,0.05) 0deg); display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 20px; }
-        .circular-progress::after { content: ""; position: absolute; width: 130px; height: 130px; background: #12141c; border-radius: 50%; }
-        .score-value { position: relative; z-index: 2; font-size: 3rem; font-weight: 800; font-family: 'Outfit'; color: #fff; }
-        .metrics-list { display: flex; flex-direction: column; gap: 20px; }
-        .metric-info { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 8px; color: var(--text-secondary); }
-        .metric-bar-bg { height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 100px; overflow: hidden; }
-        .metric-bar-fill { height: 100%; background: var(--accent-primary); border-radius: 100px; transition: width 1s cubic-bezier(0.16, 1, 0.3, 1); }
-        .btn-ninja { background: var(--accent-primary); color: white; border: none; padding: 14px 28px; border-radius: var(--radius-md); font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 12px; text-decoration: none; justify-content: center; }
-        .btn-ninja:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4); }
+        body { background: var(--bg-main); color: var(--text-primary); font-family: 'Inter', sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+        
+        /* Layout Structure - Mapped to HTML IDs/Classes */
+        #appScreen.app-shell { display: flex; width: 100%; min-height: 100vh; }
+        .pro-sidebar { width: 280px; flex-shrink: 0; background: var(--bg-card); border-right: 1px solid var(--border-dim); padding: 32px 24px; display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0; z-index: 100; }
+        
+        .main-stage { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .top-bar { padding: 24px 48px; border-bottom: 1px solid var(--border-dim); background: rgba(10,11,16,0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 90; }
+        .content-scroll { flex: 1; min-width: 0; width: 100%; padding: 48px; overflow-x: hidden; }
+        .content-scroll-inner { max-width: 1200px; margin: 0 auto; }
+
+        @media (max-width: 1024px) {
+            .pro-sidebar { width: 220px; padding: 24px 16px; }
+            .content-scroll { padding: 32px; }
+            .top-bar { padding: 20px 24px; }
+        }
+        @media (max-width: 768px) {
+            .pro-sidebar { width: 200px; padding: 20px 12px; }
+            .content-scroll { padding: 24px; }
+            .top-bar { padding: 16px 20px; }
+            .pro-card { padding: 24px; }
+        }
+        @media (max-width: 640px) {
+            #appScreen.app-shell { flex-direction: column; }
+            .pro-sidebar { width: 100%; height: auto; position: static; padding: 16px; flex-direction: row; flex-wrap: wrap; gap: 8px; border-right: none; border-bottom: 1px solid var(--border-dim); }
+            .pro-sidebar .brand-section { margin-bottom: 0 !important; }
+            .pro-sidebar .nav-group { display: none; }
+            .main-stage { width: 100%; }
+            .content-scroll { padding: 16px; }
+            .top-bar { padding: 12px 16px; }
+            .pro-card { padding: 16px; }
+            .wizard-stepper { gap: 16px; flex-wrap: wrap; }
+            .oracle-score-container { grid-template-columns: 1fr; gap: 24px; }
+        }
+        
+        /* Typography & Headings */
+        h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; letter-spacing: -0.02em; color: #fff; margin-bottom: 1rem; }
+        p { color: var(--text-secondary); }
+
+        /* Unified Form Styling */
+        .input-group, .field-group { margin-bottom: 24px; display: flex; flex-direction: column; width: 100%; text-align: left; }
+        .input-label, .field-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 8px; display: block; }
+        
+        .input-pro, .input-pro-textarea, .draft-edit { 
+            width: 100%; background: var(--bg-input); border: 1px solid var(--border-dim); border-radius: var(--radius-md); 
+            padding: 16px 20px; color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: 1rem; 
+            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1); outline: none; display: block; min-height: 56px;
+        }
+        .input-pro:focus, .input-pro-textarea:focus, .draft-edit:focus { 
+            border-color: var(--accent-primary); background: rgba(0,0,0,0.4); box-shadow: 0 0 0 4px var(--accent-glow); 
+        }
+
+        /* Sidebar Nav */
+        .nav-link { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; color: var(--text-secondary); text-decoration: none; font-weight: 500; font-size: 0.9rem; transition: 0.2s; margin-bottom: 4px; }
+        .nav-link:hover { background: rgba(255,255,255,0.03); color: #fff; }
+        .nav-link.active { background: rgba(99,102,241,0.1); color: var(--accent-primary); }
+        .nav-label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.1em; margin: 24px 0 12px 16px; display: block; }
+
+        /* Cards */
+        .pro-card, .json-card { background: var(--bg-card); border: 1px solid var(--border-dim); border-radius: var(--radius-lg); padding: 32px; margin-bottom: 32px; position: relative; }
+        
+        /* Wizard Specifics */
+        .wizard-stepper { display: flex; gap: 40px; margin-bottom: 48px; border-bottom: 1px solid var(--border-dim); padding-bottom: 16px; }
+        .step-item { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 0.9rem; font-weight: 600; }
+        .step-item.active { color: var(--accent-primary); }
+        .step-number { width: 28px; height: 28px; border-radius: 50%; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+
+        /* Oracle Score */
+        .oracle-score-container { display: grid; grid-template-columns: 240px 1fr; gap: 48px; align-items: start; background: rgba(255,255,255,0.01); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--border-dim); }
+        .circular-progress { width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(var(--accent-primary) calc(var(--progress) * 3.6deg), rgba(255,255,255,0.05) 0deg); display: flex; align-items: center; justify-content: center; position: relative; margin: 0 auto 20px; }
+        .circular-progress::after { content: ""; position: absolute; width: 110px; height: 110px; background: var(--bg-card); border-radius: 50%; }
+        .score-value { position: relative; z-index: 2; font-size: 2.5rem; font-weight: 800; font-family: 'Outfit'; color: #fff; }
+        
+        /* Buttons */
+        .btn-ninja { background: var(--accent-primary); color: white; border: none; padding: 14px 28px; border-radius: var(--radius-md); font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 10px; text-decoration: none; justify-content: center; }
+        .btn-ninja:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 8px 20px rgba(99,102,241,0.3); }
         .btn-secondary { background: transparent; border: 1px solid var(--border-dim); color: var(--text-secondary); }
-        .variation-tabs { display: flex; gap: 12px; margin-bottom: 40px; justify-content: center; background: rgba(255, 255, 255, 0.03); padding: 8px; border-radius: 100px; width: fit-content; margin-left: auto; margin-right: auto; }
-        .tab-btn { background: transparent; border: none; color: var(--text-secondary); padding: 10px 24px; border-radius: 100px; cursor: pointer; font-weight: 700; font-size: 0.85rem; transition: 0.2s; }
-        .tab-btn.active { background: var(--accent-primary); color: white; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
-        .post-image, .generated-video { width: 100%; border-radius: var(--radius-md); border: 1px solid var(--border-dim); margin-bottom: 32px; display: block; }
-        .video-player-container { position: relative; border-radius: var(--radius-md); overflow: hidden; margin-bottom: 32px; }
-        .btn-download-video { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); padding: 10px 20px; border-radius: 100px; color: white; text-decoration: none; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.15); transition: 0.2s; z-index: 10; }
+        
+        /* Helpers */
         .hidden { display: none !important; }
-        .fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .pro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; }
-        .btn-publish-meta { background: #0668E1; color: white; }
-        .btn-publish-tiktok { background: #ff0050; color: white; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+        .pro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+        .lead-form-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; align-items: flex-end; }
+        @media (max-width: 800px) { .lead-form-grid { grid-template-columns: 1fr 1fr; } .lead-form-grid .btn-ninja { grid-column: 1 / -1; } }
+        @media (max-width: 500px) { .lead-form-grid { grid-template-columns: 1fr; } }
     </style>
     <script src="/static/js/modules.js?v=4.0" defer></script>
     <script src="/static/js/aura_v1.js" defer></script>
@@ -172,6 +226,7 @@
             </header>
 
             <div class="content-scroll">
+                <div class="content-scroll-inner">
                 
                 <!-- TAB: WIZARD -->
                 <section id="tab-wizard" class="tab-pane active fade-in">
@@ -299,7 +354,7 @@
                     </div>
 
                     <div class="pro-card" style="margin-bottom: 24px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; align-items: flex-end;">
+                        <div class="lead-form-grid">
                             <div class="input-group" style="margin-bottom:0;">
                                 <label class="input-label">Nicho de Mercado</label>
                                 <input type="text" id="leadNicho" class="input-pro" placeholder="Ex: Dentistas, Academias...">
@@ -308,7 +363,7 @@
                                 <label class="input-label">Localização</label>
                                 <input type="text" id="leadCidade" class="input-pro" placeholder="Ex: São Paulo, SP">
                             </div>
-                            <button id="btnBuscarLeads" class="btn-ninja" style="height: 48px;">Caçar Leads</button>
+                            <button id="btnBuscarLeads" class="btn-ninja" style="height: 48px; white-space: nowrap;">Caçar Leads</button>
                         </div>
                     </div>
 
@@ -318,8 +373,8 @@
                     </div>
 
                     <div id="leadsListArea" class="hidden">
-                        <div class="pro-card" style="padding: 0; overflow: hidden;">
-                            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <div class="pro-card" style="padding: 0; overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 480px;">
                                 <thead style="background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-dim);">
                                     <tr>
                                         <th style="padding: 16px; text-align: left;">Empresa</th>
@@ -345,7 +400,7 @@
                         </div>
                         <button id="btnLoadHistory" class="btn-ninja" style="background: transparent; border: 1px solid var(--border-dim); color: var(--text-secondary);">🔄 Atualizar Lista</button>
                     </div>
-                    <div id="historyList" class="pro-grid">
+                    <div id="historyList">
                         <!-- History items populated by JS -->
                     </div>
                 </section>
@@ -383,25 +438,92 @@
                         <h1 style="font-size: 2rem;">Brand <span style="color: var(--accent-primary);">Kit</span></h1>
                         <p style="color: var(--text-secondary);">Defina a alma e a voz da sua marca para a IA.</p>
                     </div>
-                    <div class="pro-card" style="max-width: 600px;">
-                        <div class="input-group">
-                            <label class="input-label">Tom de Voz</label>
-                            <input type="text" id="configTomDeVoz" class="input-pro" placeholder="Ex: Persuasivo, Irônico, Profissional...">
+                    <div style="display:grid; gap:32px; max-width:600px;">
+                        <div class="pro-card">
+                            <div class="input-group">
+                                <label class="input-label">Tom de Voz</label>
+                                <input type="text" id="configTomDeVoz" class="input-pro" placeholder="Ex: Persuasivo, Irônico, Profissional...">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Público-Alvo Detalhado</label>
+                                <textarea id="configPublicoAlvo" class="input-pro" style="height: 100px;" placeholder="Ex: Homens de 25-40 anos interessados em investimentos..."></textarea>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Personalidade da Marca</label>
+                                <input type="text" id="configPersonality" class="input-pro" placeholder="Ex: Inovadora, Confiável, Disruptiva, Luxo...">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Paleta de Cores</label>
+                                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                    <input type="color" id="configColor1" value="#8b5cf6" style="width:48px;height:48px;border-radius:12px;border:2px solid var(--border-dim);cursor:pointer;background:none;">
+                                    <input type="color" id="configColor2" value="#10b981" style="width:48px;height:48px;border-radius:12px;border:2px solid var(--border-dim);cursor:pointer;background:none;">
+                                    <input type="color" id="configColor3" value="#f59e0b" style="width:48px;height:48px;border-radius:12px;border:2px solid var(--border-dim);cursor:pointer;background:none;">
+                                    <input type="color" id="configColor4" value="#ffffff" style="width:48px;height:48px;border-radius:12px;border:2px solid var(--border-dim);cursor:pointer;background:none;">
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Estilo Visual</label>
+                                <input type="text" id="configVisualStyle" class="input-pro" placeholder="Ex: Minimalista, Dark mode, Vibrante, Fotográfico...">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Fontes da Marca</label>
+                                <input type="text" id="configFonts" class="input-pro" placeholder="Ex: Inter, Montserrat, Playfair Display...">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Palavras Proibidas (evitar nas campanhas)</label>
+                                <input type="text" id="configForbiddenWords" class="input-pro" placeholder="Ex: barato, grátis, guarantee, clique aqui...">
+                            </div>
+                            <div style="display:flex; gap:12px; margin-top:8px;">
+                                <button id="btnSaveConfig" class="btn-ninja" style="flex:1; justify-content:center;">Salvar Identidade</button>
+                                <button id="btnResetBrand" class="btn-ninja btn-secondary" style="padding:12px 24px;">↺</button>
+                            </div>
+                            <p id="configSaveMsg" class="hidden" style="color: #10b981; font-size: 0.8rem; margin-top: 12px; text-align: center;">✅ Identidade da Marca Atualizada!</p>
                         </div>
-                        <div class="input-group">
-                            <label class="input-label">Público-Alvo Detalhado</label>
-                            <textarea id="configPublicoAlvo" class="input-pro" style="height: 120px;" placeholder="Ex: Homens de 25-40 anos interessados em investimentos..."></textarea>
+                        <div class="pro-card">
+                            <h3 style="margin-bottom:16px; font-size:1.1rem;">Integrações da Marca</h3>
+                            <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:20px;">Conecte suas contas de anúncios para publicar campanhas diretamente do MKTPilot.</p>
+                            <div id="metaConnectArea" style="margin-bottom:16px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border:1px solid var(--border-dim); border-radius:12px;">
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                                        <div>
+                                            <div style="font-weight:600; font-size:0.9rem;">Meta Ads</div>
+                                            <div id="metaStatusText" style="font-size:0.75rem; opacity:0.6;">Verificando...</div>
+                                        </div>
+                                    </div>
+                                    <button id="btnConnectMeta" class="btn-ninja" style="padding:6px 16px; font-size:0.75rem;">Conectar</button>
+                                </div>
+                            </div>
+                            <div id="tiktokConnectArea">
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border:1px solid var(--border-dim); border-radius:12px;">
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#000"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+                                        <div>
+                                            <div style="font-weight:600; font-size:0.9rem;">TikTok Ads</div>
+                                            <div id="tiktokStatusText" style="font-size:0.75rem; opacity:0.6;">Verificando...</div>
+                                        </div>
+                                    </div>
+                                    <button id="btnConnectTikTok" class="btn-ninja" style="padding:6px 16px; font-size:0.75rem;">Conectar</button>
+                                </div>
+                            </div>
                         </div>
-                        <button id="btnSaveConfig" class="btn-ninja" style="width: 100%; justify-content: center;">Salvar Identidade</button>
-                        <p id="configSaveMsg" class="hidden" style="color: #10b981; font-size: 0.8rem; margin-top: 12px; text-align: center;">✅ Identidade da Marca Atualizada!</p>
                     </div>
                 </section>
+                </div>
             </div>
         </main>
 
         <!-- Monitor de Tarefas (Floating Bottom Right) -->
         <div id="activeJobsArea" class="hidden" style="position: fixed; bottom: 32px; right: 32px; width: 340px; z-index: 5000;">
             <div id="activeJobsList"></div>
+        </div>
+
+        <!-- Modal de Detalhe de Campanha -->
+        <div id="campaignModal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;overflow-y:auto;padding:40px 20px;">
+            <div style="max-width:900px;margin:0 auto;position:relative;">
+                <button onclick="document.getElementById('campaignModal').classList.add('hidden')" style="position:sticky;top:20px;float:right;z-index:10;background:var(--accent-primary);color:#fff;border:none;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:1.1rem;">✕</button>
+                <div id="campaignModalContent"></div>
+            </div>
         </div>
     </div>
 

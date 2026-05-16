@@ -2,8 +2,37 @@ from flask import Blueprint, request, jsonify, session
 import openai
 import json, re, datetime
 import os
+from dotenv import load_dotenv
+from supabase import create_client
+
+load_dotenv(override=True)
 
 modules_bp = Blueprint("modules", __name__, url_prefix="/api/modules")
+
+# ─── Auth Check ────────────────────────────────────────────────────────────────
+def _check_auth():
+    """Validate Bearer token via Supabase. Returns user or None."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth.split(" ", 1)[1]
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    try:
+        sb = create_client(url, key)
+        user = sb.auth.get_user(token)
+        return user.user
+    except Exception:
+        return None
+
+@modules_bp.before_request
+def _require_auth():
+    if request.method == "OPTIONS":
+        return None
+    if not _check_auth():
+        return jsonify({"erro": "Não autorizado"}), 401
 
 # ─── cliente OpenRouter ───────────────────────────────────────────────────────
 client = openai.OpenAI(
